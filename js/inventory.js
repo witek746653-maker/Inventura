@@ -1,0 +1,319 @@
+/**
+ * Логика работы с инвентаризацией
+ * 
+ * Этот файл содержит функции для создания сессий инвентаризации,
+ * подсчета товаров и управления процессом инвентаризации.
+ */
+
+import * as db from './db.js';
+import * as supabase from './supabase.js';
+
+/**
+ * Генерировать уникальный ID
+ * 
+ * @returns {string} - UUID
+ */
+function generateId() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
+ * Создать новую сессию инвентаризации
+ * 
+ * @param {Object} sessionData - Данные сессии
+ * @param {string} sessionData.date - Дата инвентаризации (YYYY-MM-DD)
+ * @param {string} sessionData.status - Статус (in_progress, completed, draft)
+ * @returns {Promise<Object>} - Promise с созданной сессией
+ */
+export async function createInventorySession(sessionData) {
+  const session = {
+    id: generateId(),
+    date: sessionData.date || new Date().toISOString().split('T')[0],
+    status: sessionData.status || 'in_progress',
+    items_count: 0
+  };
+  
+  try {
+    // Сохраняем локально
+    const localSession = await db.addInventorySession(session);
+    
+    // Пытаемся синхронизировать с сервером
+    try {
+      const serverSession = await supabase.createInventorySession(session);
+      await db.updateInventorySession(session.id, { ...serverSession, synced: true });
+      return { ...serverSession, synced: true };
+    } catch (syncError) {
+      console.warn('Не удалось синхронизировать сессию с сервером:', syncError);
+      return localSession;
+    }
+  } catch (error) {
+    console.error('Ошибка создания сессии инвентаризации:', error);
+    throw error;
+  }
+}
+
+/**
+ * Получить все сессии инвентаризации
+ * 
+ * @returns {Promise<Array>} - Promise с массивом сессий
+ */
+export async function getAllInventorySessions() {
+  try {
+    const localSessions = await db.getAllInventorySessions();
+    
+    try {
+      const serverSessions = await supabase.fetchAllInventorySessions();
+      
+      // Объединяем данные
+      const sessionsMap = new Map();
+      
+      serverSessions.forEach(session => {
+        sessionsMap.set(session.id, { ...session, synced: true });
+      });
+      
+      localSessions.forEach(session => {
+        if (!sessionsMap.has(session.id)) {
+          sessionsMap.set(session.id, session);
+        }
+      });
+      
+      // Обновляем локальную базу
+      for (const session of serverSessions) {
+        await db.updateInventorySession(session.id, { ...session, synced: true }).catch(() => {
+          db.addInventorySession({ ...session, synced: true }).catch(() => {});
+        });
+      }
+      
+      return Array.from(sessionsMap.values());
+    } catch (syncError) {
+      console.warn('Не удалось получить сессии с сервера:', syncError);
+      return localSessions;
+    }
+  } catch (error) {
+    console.error('Ошибка получения сессий:', error);
+    throw error;
+  }
+}
+
+/**
+ * Получить сессию по ID
+ * 
+ * @param {string} id - ID сессии
+ * @returns {Promise<Object>} - Promise с сессией
+ */
+export async function getInventorySessionById(id) {
+  try {
+    let session = await db.getInventorySessionById(id);
+    
+    if (!session || !session.synced) {
+      try {
+        const serverSession = await supabase.fetchInventorySessionById(id);
+        if (serverSession) {
+          if (session) {
+            await db.updateInventorySession(id, { ...serverSession, synced: true });
+          } else {
+            await db.addInventorySession({ ...serverSession, synced: true });
+          }
+          return { ...serverSession, synced: true };
+        }
+      } catch (syncError) {
+        console.warn('Не удалось получить сессию с сервера:', syncError);
+      }
+    }
+    
+    return session;
+  } catch (error) {
+    console.error('Ошибка получения сессии:', error);
+    throw error;
+  }
+}
+
+/**
+ * Обновить сессию инвентаризации
+ * 
+ * @param {string} id - ID сессии
+ * @param {Object} updates - Объект с изменениями
+ * @returns {Promise<Object>} - Promise с обновленной сессией
+ */
+export async function updateInventorySession(id, updates) {
+  try {
+    const localSession = await db.updateInventorySession(id, updates);
+    
+    try {
+      const serverSession = await supabase.updateInventorySession(id, updates);
+      await db.updateInventorySession(id, { ...serverSession, synced: true });
+      return { ...serverSession, synced: true };
+    } catch (syncError) {
+      console.warn('Не удалось синхронизировать обновление сессии:', syncError);
+      return localSession;
+    }
+  } catch (error) {
+    console.error('Ошибка обновления сессии:', error);
+    throw error;
+  }
+}
+
+/**
+ * Завершить сессию инвентаризации
+ * 
+ * @param {string} id - ID сессии
+ * @returns {Promise<Object>} - Promise с обновленной сессией
+ */
+export async function completeInventorySession(id) {
+  return await updateInventorySession(id, {
+    status: 'completed',
+    updated_at: new Date().toISOString()
+  });
+}
+
+/**
+ * Добавить или обновить запись инвентаризации для товара
+ * 
+ * @param {string} sessionId - ID сессии
+ * @param {string} itemId - ID товара
+ * @param {number} quantity - Количество
+ * @param {number} previousQuantity - Предыдущее количество (опционально)
+ * @param {string} comment - Комментарий (опционально)
+ * @returns {Promise<Object>} - Promise с записью инвентаризации
+ */
+export async function addOrUpdateInventoryItem(sessionId, itemId, quantity, previousQuantity = null, comment = null) {
+  try {
+    // Получаем существующие записи для этой сессии и товара
+    const existingItems = await db.getInventoryItemsBySession(sessionId);
+    const existingItem = existingItems.find(item => item.item_id === itemId);
+    
+    const inventoryItem = {
+      id: existingItem ? existingItem.id : generateId(),
+      session_id: sessionId,
+      item_id: itemId,
+      quantity: quantity,
+      previous_quantity: previousQuantity,
+      difference: previousQuantity !== null ? quantity - previousQuantity : null,
+      comment: comment
+    };
+    
+    if (existingItem) {
+      // Обновляем существующую запись
+      const localItem = await db.updateInventoryItem(existingItem.id, inventoryItem);
+      
+      try {
+        const serverItem = await supabase.updateInventoryItem(existingItem.id, inventoryItem);
+        await db.updateInventoryItem(existingItem.id, { ...serverItem, synced: true });
+        return { ...serverItem, synced: true };
+      } catch (syncError) {
+        console.warn('Не удалось синхронизировать обновление записи:', syncError);
+        return localItem;
+      }
+    } else {
+      // Создаем новую запись
+      const localItem = await db.addInventoryItem(inventoryItem);
+      
+      try {
+        const serverItem = await supabase.createInventoryItem(inventoryItem);
+        await db.updateInventoryItem(inventoryItem.id, { ...serverItem, synced: true });
+        return { ...serverItem, synced: true };
+      } catch (syncError) {
+        console.warn('Не удалось синхронизировать создание записи:', syncError);
+        return localItem;
+      }
+    }
+  } catch (error) {
+    console.error('Ошибка добавления записи инвентаризации:', error);
+    throw error;
+  }
+}
+
+/**
+ * Получить все записи инвентаризации для сессии
+ * 
+ * @param {string} sessionId - ID сессии
+ * @returns {Promise<Array>} - Promise с массивом записей
+ */
+export async function getInventoryItemsBySession(sessionId) {
+  try {
+    const localItems = await db.getInventoryItemsBySession(sessionId);
+    
+    try {
+      const serverItems = await supabase.fetchInventoryItemsBySession(sessionId);
+      
+      // Объединяем данные
+      const itemsMap = new Map();
+      
+      serverItems.forEach(item => {
+        itemsMap.set(item.id, { ...item, synced: true });
+      });
+      
+      localItems.forEach(item => {
+        if (!itemsMap.has(item.id)) {
+          itemsMap.set(item.id, item);
+        }
+      });
+      
+      // Обновляем локальную базу
+      for (const item of serverItems) {
+        await db.updateInventoryItem(item.id, { ...item, synced: true }).catch(() => {
+          db.addInventoryItem({ ...item, synced: true }).catch(() => {});
+        });
+      }
+      
+      return Array.from(itemsMap.values());
+    } catch (syncError) {
+      console.warn('Не удалось получить записи с сервера:', syncError);
+      return localItems;
+    }
+  } catch (error) {
+    console.error('Ошибка получения записей инвентаризации:', error);
+    throw error;
+  }
+}
+
+/**
+ * Получить статистику по сессии инвентаризации
+ * 
+ * @param {string} sessionId - ID сессии
+ * @returns {Promise<Object>} - Promise со статистикой
+ */
+export async function getSessionStatistics(sessionId) {
+  try {
+    const items = await getInventoryItemsBySession(sessionId);
+    
+    const total = items.length;
+    const withDifference = items.filter(item => item.difference !== null && item.difference !== 0).length;
+    const positiveDifference = items.filter(item => item.difference !== null && item.difference > 0).length;
+    const negativeDifference = items.filter(item => item.difference !== null && item.difference < 0).length;
+    
+    return {
+      total,
+      withDifference,
+      positiveDifference,
+      negativeDifference,
+      noDifference: total - withDifference
+    };
+  } catch (error) {
+    console.error('Ошибка получения статистики:', error);
+    throw error;
+  }
+}
+
+/**
+ * Обновить количество обработанных товаров в сессии
+ * 
+ * @param {string} sessionId - ID сессии
+ * @returns {Promise} - Promise с результатом операции
+ */
+export async function updateSessionItemsCount(sessionId) {
+  try {
+    const items = await getInventoryItemsBySession(sessionId);
+    await updateInventorySession(sessionId, {
+      items_count: items.length
+    });
+  } catch (error) {
+    console.error('Ошибка обновления количества товаров:', error);
+    throw error;
+  }
+}
+

@@ -1,0 +1,21 @@
+# Конфигурационные файлы с секретами
+config/supabase-config.js
+
+# Логи и временные файлы
+*.log
+*.tmp
+.DS_Store
+
+# Редакторы
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node modules (если понадобятся позже)
+node_modules/
+package-lock.json
+
+# Браузерные файлы
+*.cache
+

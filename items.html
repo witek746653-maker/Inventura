@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+
+<html class="light" lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>База предметов</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white h-screen overflow-hidden flex flex-col">
+<!-- Top App Bar -->
+<header class="flex-none bg-white dark:bg-[#1e293b] shadow-sm z-20 pb-2 pt-safe-top">
+<div class="flex items-center px-4 py-3 justify-between">
+<button class="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-slate-900 dark:text-white" style="font-size: 24px;">arrow_back</span>
+</button>
+<h2 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center pr-10">База предметов</h2>
+<!-- Placeholder to balance the back button visually if needed, or filter icon -->
+<button class="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors absolute right-4">
+<span class="material-symbols-outlined text-slate-900 dark:text-white" style="font-size: 24px;">filter_list</span>
+</button>
+</div>
+<!-- Search Bar -->
+<div class="px-4 pb-2">
+<label class="flex flex-col h-12 w-full">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full bg-[#e7edf3] dark:bg-slate-800 transition-colors">
+<div class="flex items-center justify-center pl-4 pr-2">
+<span class="material-symbols-outlined text-[#4c739a] dark:text-slate-400" style="font-size: 24px;">search</span>
+</div>
+<input class="flex w-full min-w-0 flex-1 resize-none overflow-hidden bg-transparent text-slate-900 dark:text-white focus:outline-0 focus:ring-0 border-none h-full placeholder:text-[#4c739a] dark:placeholder:text-slate-500 text-base font-normal leading-normal" placeholder="Поиск по названию..." value=""/>
+</div>
+</label>
+</div>
+<!-- Filter Chips -->
+<div class="flex gap-2 px-4 py-2 overflow-x-auto no-scrollbar">
+<!-- Active Chip -->
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-primary px-5 transition-colors shadow-sm">
+<p class="text-white text-sm font-medium leading-normal">Все</p>
+</button>
+<!-- Inactive Chips -->
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-5 transition-colors">
+<p class="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal">Посуда</p>
+</button>
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-5 transition-colors">
+<p class="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal">Приборы</p>
+</button>
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-5 transition-colors">
+<p class="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal">Оборудование</p>
+</button>
+<button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-5 transition-colors">
+<p class="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal">Расходники</p>
+</button>
+</div>
+</header>
+<!-- Main Content List -->
+<main class="flex-1 overflow-y-auto p-4 space-y-3 pb-24 no-scrollbar">
+<!-- List Item 1 -->
+<div class="flex items-center gap-4 bg-white dark:bg-[#1e293b] p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 active:scale-[0.99] transition-transform cursor-pointer">
+<div class="bg-center bg-no-repeat bg-cover rounded-lg size-16 shrink-0 bg-slate-200" data-alt="Close up of a black cast iron grill pan on a wooden table" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC0gkecmNat8XMTqRqZcWgPrXlE4Kj0e5giuBtRJ73IsjMcTSRud0gdvoCYvD6ldVtcPy2BOZCm0ZZcfCjWSAZjBPFVKQvMzUlBsQgWLIYt_hn1m8K3ZguynIFK4WfVgDsC0F8zgaJzEaZmAh8DkWl0k-Bu-63C5ILLXPAiRG4ahX0D1hwAzdHKrVYAmpg1g6Fr_8B4W-Lxx3tVoT7mf_FCqOx-PMfGcQCe34BE4mGUeXzkKln4pbqih_YG9mSHNaRCyPTKEcVcLO2I");'></div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-tight line-clamp-1 mb-1">Сковорода гриль чугунная</p>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center rounded-md bg-orange-50 dark:bg-orange-900/30 px-2 py-1 text-xs font-medium text-orange-700 dark:text-orange-300 ring-1 ring-inset ring-orange-600/10">Кухня</span>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">32 см • шт.</p>
+</div>
+</div>
+<div class="shrink-0 text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined" style="font-size: 24px;">chevron_right</span>
+</div>
+</div>
+<!-- List Item 2 -->
+<div class="flex items-center gap-4 bg-white dark:bg-[#1e293b] p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 active:scale-[0.99] transition-transform cursor-pointer">
+<div class="bg-center bg-no-repeat bg-cover rounded-lg size-16 shrink-0 bg-slate-200" data-alt="Transparent wine glass with red wine on a dark background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCJRLN60CjUOtscYJ4kjcwCk1y38ItQQxkxgI0Akki3I6KIyGwVtQ8XYrgt2RM8BKlsj_tHPJiGfMyqnno222if3wLzHPXr6eSpso1Bfg6W1Bb6OYC6gBW2J0bq71v6ay7AsFZkVConRmHLKXioNVSeB1E2mxTUsfAMp8PxWoBIzYAs4cBIzdddkAQz5hi2KiMSgrf8W0dMLs5p7RMWAwC34ijy2q8qEbj4iBV-E4Qjdh4qY94PgsEGcOBSLdlDwfH2_JIuqg_e1xYe");'></div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-tight line-clamp-1 mb-1">Бокал для вина 350мл</p>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center rounded-md bg-purple-50 dark:bg-purple-900/30 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-300 ring-1 ring-inset ring-purple-700/10">Бар</span>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Стекло • шт.</p>
+</div>
+</div>
+<div class="shrink-0 text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined" style="font-size: 24px;">chevron_right</span>
+</div>
+</div>
+<!-- List Item 3 -->
+<div class="flex items-center gap-4 bg-white dark:bg-[#1e293b] p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 active:scale-[0.99] transition-transform cursor-pointer">
+<div class="bg-center bg-no-repeat bg-cover rounded-lg size-16 shrink-0 bg-slate-200" data-alt="Set of stainless steel cutlery forks and knives" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA6UNe9JITWJLoQHpi8gNFwIyHwdYGVw6_doC2tOt801pMrkdctTVKW3ST70hCZ3gZmmAr7_ONXe4PArNA_2ZsshDFyddvRRueDNA9wQsY7z9Has1KQ2cryN3Z7f30AqyTCAkog6w1U81bWBLd3bX80FdWBxuI_S3FErND3X1D_eThOmvfBFkulL_Jd97na856DKdFkFsSWw9o6EJgil5iQnMXWoAsOM8gdQ8JgRte756nrJILK6Rzi50-_VOkKLU2ed3djWhDcoj2o");'></div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-tight line-clamp-1 mb-1">Набор вилок столовых</p>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-700/10">Зал</span>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Нерж. • набор</p>
+</div>
+</div>
+<div class="shrink-0 text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined" style="font-size: 24px;">chevron_right</span>
+</div>
+</div>
+<!-- List Item 4 -->
+<div class="flex items-center gap-4 bg-white dark:bg-[#1e293b] p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 active:scale-[0.99] transition-transform cursor-pointer">
+<div class="bg-center bg-no-repeat bg-cover rounded-lg size-16 shrink-0 bg-slate-200" data-alt="Professional espresso coffee machine metallic texture" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA-oat4SXccOHXTbz17fr_Ei-AeoapO46Hthqium__d3dZwj8dY6CqLIluaDkW4dUt23ufxt5968nBtVfza3OZJANpWlljrPzLwnyqWuv8DBLO3vnISK7NIXv8N8X48yc-Ff7MRS3UQJcE8_y7YPQSw5M2lDXVuOL8BGC14ornkCqSBn8qcgfQD2fROoie4raUjx8yXWNVtvLmz69l2YXZ9AbuFdrhB7cRiHXXQ12ARLlskzlOPMZ_5UcPh3ufOhm6jOOSwevZXbM9R");'></div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-tight line-clamp-1 mb-1">Кофемашина Simonelli</p>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-700 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 ring-1 ring-inset ring-slate-500/10">Оборудование</span>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">2 группы</p>
+</div>
+</div>
+<div class="shrink-0 text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined" style="font-size: 24px;">chevron_right</span>
+</div>
+</div>
+<!-- List Item 5 -->
+<div class="flex items-center gap-4 bg-white dark:bg-[#1e293b] p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 active:scale-[0.99] transition-transform cursor-pointer">
+<div class="bg-center bg-no-repeat bg-cover rounded-lg size-16 shrink-0 bg-slate-200" data-alt="Stack of white ceramic plates" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCLfKzex9U9Fx9fe_4aA7EG_vr72YGyFbIWgA1OD8sFBUOz1kBGamf6y46s5CkhWtpW8DN6E14O1O2JTRZ3muzmxA9gFB_7dsc5w6Rd8MZufRe6egVwg6Ewe-gdtE4AzzB4znU_3R_5CaYV6G5jp3wDN2k2KkP9wce-vpNrHyyWMvTTaMaOA53NbJ-C8Httdnf7PTb1_kYiKjvFPKdjTbQZEmOH4Dex2nOu0mQ1DIlggvY9wA68zmCmiE0GiA1WF5THXWCGjTcKrZbg");'></div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-tight line-clamp-1 mb-1">Тарелка обеденная 27см</p>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center rounded-md bg-orange-50 dark:bg-orange-900/30 px-2 py-1 text-xs font-medium text-orange-700 dark:text-orange-300 ring-1 ring-inset ring-orange-600/10">Кухня</span>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Керамика • шт.</p>
+</div>
+</div>
+<div class="shrink-0 text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined" style="font-size: 24px;">chevron_right</span>
+</div>
+</div>
+<!-- List Item 6 -->
+<div class="flex items-center gap-4 bg-white dark:bg-[#1e293b] p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 active:scale-[0.99] transition-transform cursor-pointer">
+<div class="bg-center bg-no-repeat bg-cover rounded-lg size-16 shrink-0 bg-slate-200" data-alt="Paper napkins stack" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDCMvzsk6N32_l9cFyGIFy1ajU2PHapZiyiFwRFwOoNhz7iuX_xQK-mz6osbiFpS0EwooMwCUW7sKc9ybXxww1bS42gwEYXXKtGJuBDCq2laKEHe3p8PRUSLcOurh_hMVzSCjhdVEsy1sYWIEggl2zKHcw2-YiUzfO2oweELSXWYFz3XShCeOxILdP7EDAcB87pg28bYC-1h8z50itfw3K1E_tThwChVmElArSPsflQWm5GQx9T20iWadhaqxkXZ8sfs-IC_4IEXMNg");'></div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-tight line-clamp-1 mb-1">Салфетки белые 33см</p>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 ring-1 ring-inset ring-gray-500/10">Расходники</span>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">100шт/уп • уп.</p>
+</div>
+</div>
+<div class="shrink-0 text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined" style="font-size: 24px;">chevron_right</span>
+</div>
+</div>
+</main>
+<!-- Floating Action Button -->
+<button class="absolute bottom-24 right-5 bg-primary hover:bg-blue-600 text-white rounded-full p-4 shadow-lg shadow-blue-500/40 z-30 transition-all active:scale-95 flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-size: 28px;">add</span>
+</button>
+<!-- Bottom Navigation -->
+<nav class="flex-none bg-white dark:bg-[#1e293b] border-t border-slate-200 dark:border-slate-800 pb-safe-bottom z-30">
+<div class="flex justify-around items-center h-16">
+<a class="flex flex-col items-center justify-center w-full h-full space-y-1" href="#">
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-500" style="font-size: 24px;">inventory_2</span>
+<span class="text-[10px] font-medium text-slate-400 dark:text-slate-500">Инвентарь</span>
+</a>
+<a class="flex flex-col items-center justify-center w-full h-full space-y-1" href="#">
+<span class="material-symbols-outlined text-primary" style="font-size: 24px;">dataset</span>
+<span class="text-[10px] font-medium text-primary">База</span>
+</a>
+<a class="flex flex-col items-center justify-center w-full h-full space-y-1" href="#">
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-500" style="font-size: 24px;">history</span>
+<span class="text-[10px] font-medium text-slate-400 dark:text-slate-500">История</span>
+</a>
+<a class="flex flex-col items-center justify-center w-full h-full space-y-1" href="#">
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-500" style="font-size: 24px;">settings</span>
+<span class="text-[10px] font-medium text-slate-400 dark:text-slate-500">Настройки</span>
+</a>
+</div>
+</nav>
+<!-- Bottom Safe Area Spacer for iOS (handled by padding but good to have conceptual block) -->
+<div class="bg-white dark:bg-[#1e293b] h-[env(safe-area-inset-bottom)] w-full"></div>
+</body></html>

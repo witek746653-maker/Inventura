@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html class="light" lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Экран инвентаризации</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2563eb",
+                        "primary-dark": "#1d4ed8",
+                        "background-light": "#f1f5f9",
+                        "background-dark": "#0f172a",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#1e293b",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.375rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "3xl": "1.5rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .hide-scroll::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scroll {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        body {
+            min-height: max(884px, 100dvh);
+            overscroll-behavior-y: none; 
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display antialiased text-slate-900 dark:text-slate-100 transition-colors duration-200">
+<div class="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-background-light dark:bg-background-dark overflow-hidden shadow-2xl border-x border-slate-200 dark:border-slate-800">
+<div class="sticky top-0 z-50 bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors shadow-sm">
+<div class="flex items-center justify-between px-4 h-16">
+<button class="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-white transition-colors active:scale-95">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="flex flex-col items-center">
+<h1 class="text-base font-bold leading-tight">Бар: Холодильник</h1>
+<span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Октябрь 2023</span>
+</div>
+<button class="flex h-10 items-center justify-center px-2 active:scale-95 transition-transform">
+<span class="text-primary dark:text-blue-400 text-base font-bold">Готово</span>
+</button>
+</div>
+<div class="px-4 pb-4">
+<div class="flex justify-between items-end mb-2">
+<span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Прогресс</span>
+<span class="text-xs font-bold text-primary dark:text-blue-400">12 / 45</span>
+</div>
+<div class="h-2 w-full bg-slate-100 dark:bg-slate-700/50 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(37,99,235,0.3)]" style="width: 26%"></div>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto pb-32 hide-scroll">
+<div class="px-4 pt-4 pb-2 space-y-3 bg-transparent z-40">
+<div class="relative group">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">
+<span class="material-symbols-outlined text-[24px]">search</span>
+</span>
+<input class="w-full h-12 pl-12 pr-4 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 rounded-2xl text-base font-medium placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm text-slate-900 dark:text-white transition-all" placeholder="Поиск по названию..." type="text"/>
+</div>
+<div class="flex gap-2 overflow-x-auto hide-scroll py-1 -mx-4 px-4">
+<button class="shrink-0 h-10 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full text-sm font-bold shadow-md active:scale-95 transition-all">
+                        Все
+                    </button>
+<button class="shrink-0 h-10 px-6 bg-white dark:bg-surface-dark text-slate-600 dark:text-slate-300 rounded-full text-sm font-medium shadow-sm border border-slate-200 dark:border-slate-700 active:bg-slate-50 dark:active:bg-slate-800 transition-colors">
+                        Алкоголь
+                    </button>
+<button class="shrink-0 h-10 px-6 bg-white dark:bg-surface-dark text-slate-600 dark:text-slate-300 rounded-full text-sm font-medium shadow-sm border border-slate-200 dark:border-slate-700 active:bg-slate-50 dark:active:bg-slate-800 transition-colors">
+                        Безалкогольные
+                    </button>
+</div>
+</div>
+<div class="px-4 space-y-5 mt-2">
+<div class="flex items-center gap-3 pt-2">
+<h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Алкоголь</h2>
+<div class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+</div>
+<div class="bg-white dark:bg-surface-dark rounded-3xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-slate-100 dark:border-slate-800 relative overflow-hidden">
+<div class="absolute top-0 right-0 p-3 z-10">
+<span class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400 px-2.5 py-1 rounded-lg">
+<span class="material-symbols-outlined text-[14px] font-black">check</span>
+                            Сохранено
+                        </span>
+</div>
+<div class="flex gap-4 mb-5 relative">
+<div class="size-16 rounded-2xl bg-slate-100 dark:bg-slate-800 shrink-0 bg-cover bg-center shadow-inner" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAestjVlHXYb8646MvOv4wo5qyhO4R-qQWkpWJYyFlhI0uhqQ_oCwKG9gqhbjy8fgzC8ZJZn8uGLTVm55XfWeCDu5Eol58vdsH6VnNNLn2nFaKOAUf8wtwTe5-D_IaJN7dqIR1i93rDGxAB4s0bNAu6GzatZNLLELV-OHVyRIBD9bc9dXS82hJVw7kzj4Yy6tyWk4_EpmdiziAcxlR5jj7sA2xLu9hR8MfehV90HSpYXV1TLiLIhIUv_VZKVwmGzDsBpr_vfhY7W4bm');"></div>
+<div class="flex flex-col justify-center flex-1 min-w-0 pr-16">
+<h3 class="font-bold text-lg text-slate-900 dark:text-white leading-tight truncate">Водка Absolut</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">0.7 л • Бутылка</p>
+</div>
+</div>
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-3">
+<button class="size-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all touch-manipulation">
+<span class="material-symbols-outlined text-3xl">remove</span>
+</button>
+<div class="flex-1 h-14 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center relative focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10 transition-all">
+<input class="w-full h-full bg-transparent text-center font-bold text-3xl text-slate-900 dark:text-white border-none focus:ring-0 p-0" inputmode="numeric" type="number" value="5"/>
+</div>
+<button class="size-14 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-blue-500/30 hover:bg-blue-600 active:scale-95 transition-all touch-manipulation">
+<span class="material-symbols-outlined text-3xl">add</span>
+</button>
+</div>
+<div class="flex items-center justify-center gap-2">
+<div class="group flex items-center gap-0.5 pl-2.5 pr-1.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50">
+<span class="text-xs font-bold text-blue-600 dark:text-blue-400">+ 2</span>
+<button class="size-5 flex items-center justify-center rounded-lg text-blue-400 hover:text-red-500 hover:bg-white dark:hover:bg-slate-800 transition-colors ml-1">
+<span class="material-symbols-outlined text-[14px]">close</span>
+</button>
+</div>
+<div class="group flex items-center gap-0.5 pl-2.5 pr-1.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50">
+<span class="text-xs font-bold text-blue-600 dark:text-blue-400">+ 3</span>
+<button class="size-5 flex items-center justify-center rounded-lg text-blue-400 hover:text-red-500 hover:bg-white dark:hover:bg-slate-800 transition-colors ml-1">
+<span class="material-symbols-outlined text-[14px]">close</span>
+</button>
+</div>
+<button class="size-8 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-400 hover:text-primary hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" title="Добавить значение">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+<button class="flex-1 py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">history</span>
+                            Прошлый: 3
+                        </button>
+<button class="size-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-slate-800 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[20px]">comment</span>
+</button>
+<button class="size-9 rounded-xl flex items-center justify-center text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 active:scale-95 transition-all" title="Калькулятор">
+<span class="material-symbols-outlined text-[20px]">calculate</span>
+</button>
+</div>
+</div>
+<div class="bg-white dark:bg-surface-dark rounded-3xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-slate-100 dark:border-slate-800 relative">
+<div class="flex gap-4 mb-4">
+<div class="size-16 rounded-2xl bg-slate-100 dark:bg-slate-800 shrink-0 bg-cover bg-center shadow-inner" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCgJzLh5LUEpwEOa4s7w5gwTNT4RbDiI2ULv6dPteQzA_WW2j3hwd9YkIV12eeYsyM9o7tYCY2gzf6FX8ct15QXfSvXfNKTybhEpaX-Ug0-vsHl1kdC7skmw8ZKYHzDnqXrZjmpw3tfRcQ_WLev03QM4lcttDM25a2vSLf0kPp84--Ez_dGBFhoVpAGy-T5LIn_C2qrCmDZ2MPxqfIxs2ZmR43gcLV2b8w3JLOZezsAcWWl5CxLubniARX1SoxEyjfEGzdPCrzYwCoZ');"></div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<h3 class="font-bold text-lg text-slate-900 dark:text-white leading-tight">Лимоны</h3>
+<div class="flex items-baseline gap-2 mt-1">
+<p class="text-sm text-slate-500 dark:text-slate-400">Кг • Весовой</p>
+<span class="text-xs text-slate-400">•</span>
+<span class="text-xs font-medium text-slate-400">Прошлый: 1.2 кг</span>
+</div>
+</div>
+</div>
+<button class="w-full py-4 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border-2 border-dashed border-slate-300 dark:border-slate-700 text-primary dark:text-blue-400 font-bold text-sm flex items-center justify-center gap-2 active:bg-blue-50 dark:active:bg-slate-800 active:border-primary/50 transition-all group">
+<span class="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">content_copy</span>
+                        Без изменений (1.2 кг)
+                    </button>
+<div class="text-center mt-3">
+<button class="text-xs font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                            Ввести вручную
+                        </button>
+</div>
+</div>
+<div class="flex items-center gap-3 pt-2">
+<h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Бакалея</h2>
+<div class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
+</div>
+<div class="bg-white dark:bg-surface-dark rounded-3xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-slate-100 dark:border-slate-800 relative group">
+<div class="flex gap-4 mb-5">
+<div class="size-16 rounded-2xl bg-slate-100 dark:bg-slate-800 shrink-0 bg-cover bg-center shadow-inner" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBF4T3o6jewB2cbT5_EEofd_6BpZmv0bN4zMpaKiLI_fijo6m8OLDuIK4eO1y8dMFJsOrTMKoQ7eLTM8r6ree3oHEwmFunCGKtMLl0FnS63ORvOL98t18r3sf9mmK82Lc45jVOGXAB8sXyS-bfp9J-CU_GTO939ov7Q-hc5o3G63BfCk59a0aq_7fA8IFl_gn1tHOWYNCHeyBg_E1jwslwmh7D3hl4O_pMLUb5F8-2p6_Dcw3672LbOUbyK9fA4dJzt1UghMWfYlQZO');"></div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<h3 class="font-bold text-lg text-slate-900 dark:text-white leading-tight">Кофе Lavazza</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">1 кг • Пачка</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="size-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all touch-manipulation">
+<span class="material-symbols-outlined text-3xl">remove</span>
+</button>
+<div class="flex-1 h-14 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center relative overflow-hidden transition-all">
+<input class="w-full h-full bg-transparent text-center font-bold text-3xl text-slate-900 dark:text-white border-none focus:ring-0 p-0 z-10" type="number" value="4"/>
+</div>
+<button class="size-14 rounded-2xl bg-slate-800 dark:bg-slate-600 text-white flex items-center justify-center shadow-lg shadow-slate-900/20 active:scale-95 active:bg-slate-900 transition-all touch-manipulation">
+<span class="material-symbols-outlined text-3xl">add</span>
+</button>
+</div>
+<div class="mt-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 border border-amber-100 dark:border-amber-800/30 flex items-start gap-3">
+<span class="material-symbols-outlined text-amber-600 dark:text-amber-500 text-[18px] mt-0.5">chat_bubble</span>
+<div class="flex-1">
+<p class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                                Одна пачка открыта, в ней осталось примерно половина.
+                            </p>
+</div>
+<button class="text-amber-400 hover:text-amber-600 transition-colors p-1 -mr-1 -mt-1">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+</button>
+</div>
+</div>
+<div class="bg-red-50/50 dark:bg-red-900/10 rounded-3xl p-5 shadow-sm border border-red-200 dark:border-red-800 relative">
+<div class="flex gap-4 mb-5">
+<div class="size-16 rounded-2xl bg-white dark:bg-slate-800 shrink-0 bg-cover bg-center shadow-inner" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCY7qfmt7ogxLVYOMVJ7FuxjWLilS8JAdoii_61AxR_WOTknmNgo7mCWI6FnN1pJgrFGASyY6ZXa2_9_LVl1A__Aaccj8i4GTYFxSrZ-CtB0SksW4HdKoapQjjkR39WLVW5J3W0NNG3LGTooW4jDecIdqYHxc5v9btBj-bO-S8J7shQssOXYKUKJoJT8KMNzNyrVZhkX6dWxuRWDcK9Cy8mrGTyvjDc0HbyzECWNkRHo7VfMH_wQgS6e9obZ8Jo8IsDKynyDWVsVLL3');"></div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<h3 class="font-bold text-lg text-slate-900 dark:text-white leading-tight">Салфетки</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Упаковка</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="size-14 rounded-2xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm flex items-center justify-center active:scale-95 transition-all touch-manipulation">
+<span class="material-symbols-outlined text-3xl">remove</span>
+</button>
+<div class="flex-1 h-14 bg-white dark:bg-slate-800 rounded-2xl border-2 border-red-300 dark:border-red-700 flex items-center justify-center relative shadow-sm">
+<input class="w-full h-full bg-transparent text-center font-bold text-3xl text-red-600 dark:text-red-400 border-none focus:ring-0 p-0" type="number" value="100"/>
+<span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-red-400">уп</span>
+</div>
+<button class="size-14 rounded-2xl bg-slate-800 dark:bg-slate-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition-all touch-manipulation">
+<span class="material-symbols-outlined text-3xl">add</span>
+</button>
+</div>
+<p class="text-xs text-red-600 dark:text-red-400 mt-3 text-center font-semibold flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+                        Значение сильно отличается от среднего (10)
+                    </p>
+</div>
+</div>
+</div>
+<div class="absolute bottom-6 left-0 right-0 px-4 flex justify-center z-50 pointer-events-none">
+<button class="pointer-events-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full pl-6 pr-8 py-4 shadow-xl shadow-slate-900/30 dark:shadow-black/50 flex items-center gap-3 font-bold text-base hover:scale-105 active:scale-95 transition-all ring-4 ring-white dark:ring-slate-800">
+<div class="size-8 rounded-full bg-slate-700 dark:bg-slate-200 flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">save</span>
+</div>
+                Сохранить прогресс
+            </button>
+</div>
+</div>
+
+</body></html>
