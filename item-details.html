@@ -4,6 +4,12 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Карточка товара</title>
+<!-- PWA мета-теги -->
+<meta name="theme-color" content="#137fec"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="assets/icons/icon-192.svg"/>
 <!-- Material Symbols -->
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -51,6 +57,15 @@
             -webkit-appearance: none; 
             margin: 0; 
         }
+        /* Custom select styling */
+        select.edit-item-field {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+        select.edit-item-field::-ms-expand {
+            display: none;
+        }
     </style>
 <style>
     body {
@@ -58,43 +73,85 @@
     }
   </style>
   </head>
-<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased overflow-hidden">
-<div class="relative flex h-full min-h-screen w-full flex-col max-w-md mx-auto group/design-root border-x border-slate-200 dark:border-slate-800">
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased min-h-screen flex flex-col">
+<div class="relative flex flex-1 flex-col w-full max-w-md lg:max-w-7xl mx-auto group/design-root border-x border-slate-200 dark:border-slate-800 lg:border-x-0">
 <!-- Header -->
 <div class="flex items-center bg-surface-light dark:bg-surface-dark p-4 sticky top-0 z-20 border-b border-slate-100 dark:border-slate-800">
-<div class="flex size-10 shrink-0 items-center justify-start cursor-pointer text-primary dark:text-white">
+<div class="flex size-10 shrink-0 items-center justify-start cursor-pointer text-primary dark:text-white" id="back-button">
 <span class="material-symbols-outlined text-3xl">chevron_left</span>
 </div>
 <h2 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Карточка товара</h2>
-<div class="flex w-10 items-center justify-end cursor-pointer">
-<span class="material-symbols-outlined text-primary text-2xl">edit</span>
+<div class="flex w-10 items-center justify-end cursor-pointer" id="edit-toggle-button">
+<span class="material-symbols-outlined text-primary text-2xl" id="edit-icon">edit</span>
 </div>
 </div>
 <!-- Scrollable Content -->
-<div class="flex-1 overflow-y-auto no-scrollbar pb-24">
+<div class="flex-1 overflow-y-auto no-scrollbar pb-24 min-h-0">
 <!-- Hero Image -->
 <div class="p-4">
-<div class="w-full aspect-[4/3] bg-center bg-no-repeat bg-cover rounded-2xl shadow-sm bg-slate-200 dark:bg-slate-700 relative overflow-hidden" data-alt="Close up shot of a frosted vodka bottle on a dark background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA51--qSPyCGYyNGAPLNaAHOMAUwGUjeJqavRE2RoZujH2FrN3yQje6NcczSc6PdI37qF53IgBWZnS6vd4Zgfsk_25SPAoz8LZ3BfXUhCBrHd2hQ5ISC1h6sm_jaUyLsCsoWov9Atq0yS4YyDvmL6tjpWrbaNt5Vpm3objMxPFjUytOi6ilDm5_9MratXx7z8PK79aHUVslsv1vpUKyHdQpXcl5ANdLalDLghA981Uc5LOmQezeUJm33SA97P9RTfyenzS2XQZtAdUE");'>
+<div class="w-full aspect-[4/3] bg-center bg-no-repeat bg-cover rounded-2xl shadow-sm bg-slate-200 dark:bg-slate-700 relative overflow-hidden" id="item-image" data-alt="Изображение товара" style='background-image: url("");'>
 <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+</div>
+<!-- Image Edit Section (hidden by default) -->
+<div id="item-image-edit-section" class="hidden mt-4">
+<label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-2">
+Фото товара
+<button class="hint-toggle-btn text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors" data-field="image" type="button">
+<span class="material-symbols-outlined text-sm">info</span>
+</button>
+</label>
+<div class="relative">
+<input id="item-image-input" type="file" accept="image/*" class="hidden" data-field="image"/>
+<div id="item-image-preview" class="hidden mb-2">
+<img id="item-image-preview-img" src="" alt="Превью" class="w-full h-48 object-cover rounded-xl border border-slate-200 dark:border-slate-700"/>
+<button id="item-image-remove" class="mt-2 text-xs font-bold text-red-600 hover:text-red-800">Удалить фото</button>
+</div>
+<button id="item-image-btn" type="button" class="w-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl px-3 py-4 text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">image</span>
+<span>Выбрать фото</span>
+</button>
+</div>
+<div class="hint-content hidden mt-1.5 p-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs text-slate-600 dark:text-slate-400" data-field="image">
+Необязательное поле. Вы можете загрузить фото товара. Поддерживаются форматы: JPG, PNG, GIF.
+</div>
 </div>
 </div>
 <!-- Title & Category -->
 <div class="px-5 pb-2">
 <div class="flex items-start justify-between gap-4">
-<h2 class="text-slate-900 dark:text-white tracking-tight text-3xl font-bold leading-tight">Absolut Vodka</h2>
+<h2 class="text-slate-900 dark:text-white tracking-tight text-3xl font-bold leading-tight" id="item-name-display">Загрузка...</h2>
+<input type="text" id="item-name-edit" class="hidden edit-item-field w-full text-slate-900 dark:text-white tracking-tight text-3xl font-bold leading-tight bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-colors" placeholder="Название товара" data-field="name">
 </div>
 <div class="flex gap-2 mt-3 flex-wrap">
-<div class="flex h-7 items-center justify-center gap-x-2 rounded-full bg-primary/10 dark:bg-primary/20 px-3">
-<span class="material-symbols-outlined text-primary text-[16px]">liquor</span>
-<p class="text-primary text-xs font-bold uppercase tracking-wide">Алкоголь</p>
+<div class="flex h-7 items-center justify-center gap-x-2 rounded-full bg-primary/10 dark:bg-primary/20 px-3" id="item-category-display">
+<span class="material-symbols-outlined text-primary text-[16px]">category</span>
+<p class="text-primary text-xs font-bold uppercase tracking-wide">-</p>
 </div>
-<div class="flex h-7 items-center justify-center gap-x-2 rounded-full bg-slate-100 dark:bg-slate-700 px-3">
-<p class="text-slate-500 dark:text-slate-300 text-xs font-medium">0.7 л</p>
+<div id="item-category-edit-wrapper" class="hidden">
+<select id="item-category-edit" class="edit-item-field h-8 min-w-[180px] px-4 rounded-full bg-primary/10 dark:bg-primary/20 border-2 border-primary/50 dark:border-primary/60 text-primary dark:text-primary text-xs font-bold uppercase tracking-wide outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none cursor-pointer pr-10" data-field="category" style="background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22%3E%3Cpath fill=%22%23137fec%22 d=%22M6 9L1 4h10z%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 12px;">
+<option value="" class="text-slate-500">ВЫБЕРИТЕ КАТЕГОРИЮ</option>
+<option value="посуда" class="text-primary">Посуда</option>
+<option value="бокалы" class="text-primary">Бокалы</option>
+<option value="приборы" class="text-primary">Приборы</option>
+<option value="инвентарь" class="text-primary">Инвентарь</option>
+<option value="расходники" class="text-primary">Расходники</option>
+<option value="прочее" class="text-primary">Прочее</option>
+</select>
+</div>
+<div class="flex h-7 items-center justify-center gap-x-2 rounded-full bg-slate-100 dark:bg-slate-700 px-3" id="item-unit-display">
+<p class="text-slate-500 dark:text-slate-300 text-xs font-medium">-</p>
+</div>
+<div id="item-unit-edit-wrapper" class="hidden">
+<select id="item-unit-edit" class="edit-item-field h-8 min-w-[140px] px-4 rounded-full bg-slate-100 dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none cursor-pointer pr-10" data-field="unit" style="background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22%3E%3Cpath fill=%22%23647588%22 d=%22M6 9L1 4h10z%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 12px;">
+<option value="" class="text-slate-500">Выберите опцию</option>
+<option value="шт." class="text-slate-700 dark:text-slate-200">шт.</option>
+<option value="комп." class="text-slate-700 dark:text-slate-200">комп.</option>
+<option value="упак." class="text-slate-700 dark:text-slate-200">упак.</option>
+</select>
 </div>
 </div>
-<p class="mt-4 text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
-                    Классическая шведская водка. Используется для коктейлей и в чистом виде. Хранить в охлажденном виде.
-                </p>
+<p class="mt-4 text-slate-500 dark:text-slate-400 text-sm leading-relaxed" id="item-description-display">-</p>
+<textarea id="item-description-edit" class="hidden edit-item-field mt-4 w-full text-slate-900 dark:text-white text-sm leading-relaxed bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-none transition-colors" rows="3" placeholder="Описание товара" data-field="description">-</textarea>
 </div>
 <div class="h-6"></div>
 <!-- Inventory Action Card -->
@@ -105,16 +162,16 @@
 <span class="material-symbols-outlined text-lg">inventory_2</span>
 </div>
 <p class="text-slate-900 dark:text-white text-base font-semibold flex-1">Текущий остаток</p>
-<span class="text-xs font-medium text-slate-400 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded">Бутылки</span>
+<span class="text-xs font-medium text-slate-400 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded" id="item-unit-badge">-</span>
 </div>
 <div class="flex items-center justify-between gap-6">
-<button class="size-14 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center active:scale-95 transition-transform hover:bg-slate-200 dark:hover:bg-slate-700">
+<button id="quantity-decrease" class="size-14 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 flex items-center justify-center transition-all cursor-not-allowed opacity-50" disabled>
 <span class="material-symbols-outlined text-3xl">remove</span>
 </button>
 <div class="flex-1 flex flex-col items-center">
-<input class="w-full text-center bg-transparent text-5xl font-bold text-slate-900 dark:text-white border-none p-0 focus:ring-0 placeholder-slate-300" inputmode="decimal" step="0.5" type="number" value="12"/>
+<input id="item-quantity" class="w-full text-center bg-transparent text-5xl font-bold text-slate-900 dark:text-white border-none p-0 focus:ring-0 placeholder-slate-300" inputmode="numeric" step="1" type="number" value="0" readonly/>
 </div>
-<button class="size-14 rounded-xl bg-primary text-white flex items-center justify-center active:scale-95 transition-transform hover:bg-primary/90 shadow-lg shadow-primary/30">
+<button id="quantity-increase" class="size-14 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 flex items-center justify-center transition-all cursor-not-allowed opacity-50" disabled>
 <span class="material-symbols-outlined text-3xl">add</span>
 </button>
 </div>
@@ -134,9 +191,18 @@
 </div>
 <div class="flex flex-col flex-1">
 <p class="text-xs text-slate-500 dark:text-slate-400">Место хранения</p>
-<p class="text-slate-900 dark:text-white text-base font-medium">Склад (Бар)</p>
+<p class="text-slate-900 dark:text-white text-base font-medium" id="item-location-display">-</p>
+<div id="item-location-edit-wrapper" class="hidden">
+<select id="item-location-edit" class="edit-item-field w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-base font-medium border-2 border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors" data-field="location">
+<option value="">Выберите место</option>
+<option value="бар">Бар</option>
+<option value="кухня">Кухня</option>
+<option value="склад">Склад</option>
+<option value="другое">Другое</option>
+</select>
+<input id="item-location-custom-edit" class="edit-item-field mt-2 w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-base font-medium border-2 border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors hidden" placeholder="Введите свой вариант" type="text" data-field="location-custom"/>
 </div>
-<span class="material-symbols-outlined text-slate-300">chevron_right</span>
+</div>
 </div>
 <div class="flex items-center gap-4 bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-slate-100 dark:border-slate-800">
 <div class="text-slate-400 dark:text-slate-500 flex items-center justify-center shrink-0">
@@ -144,7 +210,10 @@
 </div>
 <div class="flex flex-col flex-1">
 <p class="text-xs text-slate-500 dark:text-slate-400">Артикул / SKU</p>
-<p class="text-slate-900 dark:text-white text-base font-medium">ABS-VOD-750</p>
+<p class="text-slate-900 dark:text-white text-base font-medium" id="item-sku-display">-</p>
+<div id="item-sku-edit-wrapper" class="hidden">
+<input type="text" id="item-sku-edit" class="edit-item-field w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-base font-medium border-2 border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors" placeholder="Артикул / SKU" data-field="sku"/>
+</div>
 </div>
 </div>
 <div class="flex items-center gap-4 bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-slate-100 dark:border-slate-800">
@@ -153,18 +222,37 @@
 </div>
 <div class="flex flex-col flex-1">
 <p class="text-xs text-slate-500 dark:text-slate-400">Последнее обновление</p>
-<p class="text-slate-900 dark:text-white text-base font-medium">2 дня назад (Алексей)</p>
+<p class="text-slate-900 dark:text-white text-base font-medium" id="item-updated-display">-</p>
 </div>
+</div>
+<!-- Кнопка удаления -->
+<div class="mt-4">
+<button id="delete-item-button" class="w-full h-12 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/25 flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+<span>Удалить позицию</span>
+</button>
 </div>
 </div>
 <div class="h-8"></div>
 </div>
-<!-- Sticky Footer -->
-<div class="fixed bottom-0 left-0 right-0 p-4 bg-surface-light/80 dark:bg-surface-dark/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-30 max-w-md mx-auto">
-<button class="w-full h-12 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-lg shadow-primary/25 flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+</div>
+<!-- Sticky Footer для режима редактирования -->
+<div id="save-item-footer" class="hidden fixed bottom-0 left-0 right-0 p-4 bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 z-[100] max-w-md lg:max-w-7xl mx-auto shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)]">
+<button id="save-item-button" class="w-full h-12 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-lg shadow-primary/25 flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
 <span class="material-symbols-outlined text-[20px]">check</span>
-<span>Подтвердить (12)</span>
+<span id="save-button-text">Сохранить изменения</span>
 </button>
 </div>
-</div>
+<!-- Подключение JavaScript модулей -->
+<script type="module" src="js/app.js"></script>
+<!-- Регистрация Service Worker для PWA -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('Service Worker зарегистрирован:', reg.scope))
+      .catch(err => console.log('Service Worker ошибка:', err));
+  });
+}
+</script>
 </body></html>

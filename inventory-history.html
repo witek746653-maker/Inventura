@@ -4,6 +4,12 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>История инвентаризаций</title>
+<!-- PWA мета-теги -->
+<meta name="theme-color" content="#137fec"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="assets/icons/icon-192.svg"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -43,6 +49,7 @@
   </style>
   </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased min-h-screen flex flex-col pb-24 selection:bg-primary/20">
+<div class="w-full max-w-7xl mx-auto flex-1 flex flex-col">
 <!-- Top App Bar -->
 <header class="sticky top-0 z-50 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 px-4 py-3 flex items-center justify-between">
 <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">История</h1>
@@ -180,27 +187,38 @@
 </div>
 </section>
 </main>
+</div>
 <!-- Bottom Navigation -->
-<nav class="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-gray-700 pb-safe pt-2 px-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-50">
-<div class="flex justify-between items-center h-14">
-<button class="flex flex-col items-center justify-center gap-1 w-16 group">
-<span class="material-symbols-outlined text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">home</span>
-<span class="text-[10px] font-medium text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">Главная</span>
+<nav class="fixed bottom-0 left-0 w-full bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 h-[80px] z-[100] shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)]">
+<div class="flex justify-between items-center max-w-md mx-auto h-full pb-4">
+<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="index.html" data-nav-page="index">
+<span class="material-symbols-outlined text-[26px]">dashboard</span>
+<span class="text-[10px] font-medium">Главная</span>
 </button>
-<button class="flex flex-col items-center justify-center gap-1 w-16 group">
-<span class="material-symbols-outlined text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">inventory_2</span>
-<span class="text-[10px] font-medium text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">Склад</span>
+<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="items.html" data-nav-page="items">
+<span class="material-symbols-outlined text-[26px]">list_alt</span>
+<span class="text-[10px] font-medium">Список</span>
 </button>
-<button class="flex flex-col items-center justify-center gap-1 w-16">
-<span class="material-symbols-outlined text-primary fill-current">history</span>
-<span class="text-[10px] font-bold text-primary">История</span>
+<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="items-management.html" data-nav-page="management">
+<span class="material-symbols-outlined text-[26px]">settings</span>
+<span class="text-[10px] font-medium">Данные</span>
 </button>
-<button class="flex flex-col items-center justify-center gap-1 w-16 group">
-<span class="material-symbols-outlined text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">settings</span>
-<span class="text-[10px] font-medium text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">Настройки</span>
+<button class="flex flex-col items-center justify-center gap-1 w-16 text-primary nav-button" data-nav-page="history">
+<span class="material-symbols-outlined filled-icon text-[26px]">bar_chart</span>
+<span class="text-[10px] font-medium">Отчеты</span>
 </button>
 </div>
-<!-- Safe area spacer for iOS home indicator -->
-<div class="h-4 w-full"></div>
 </nav>
+<!-- Подключение JavaScript модулей -->
+<script type="module" src="js/app.js"></script>
+<!-- Регистрация Service Worker для PWA -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('Service Worker зарегистрирован:', reg.scope))
+      .catch(err => console.log('Service Worker ошибка:', err));
+  });
+}
+</script>
 </body></html>

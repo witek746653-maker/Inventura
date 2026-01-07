@@ -42,35 +42,75 @@ export async function syncItems() {
       try {
         const { synced: _, ...itemToSend } = item;
         
-        if (item.id && item.id.startsWith('xxxxxxxx')) {
-          // Это новый товар, создаем на сервере
-          const serverItem = await supabase.createItem(itemToSend);
-          await db.updateItem(item.id, { ...serverItem, synced: true });
-          synced++;
-        } else {
-          // Проверяем, существует ли товар на сервере
+        // Проверяем, существует ли товар на сервере
+        let existingItem = null;
+        try {
+          existingItem = await supabase.fetchItemById(item.id);
+        } catch (fetchError) {
+          // Если товар не найден (404), existingItem останется null
+          // Если другая ошибка, логируем и продолжаем
+          if (!fetchError.message || !fetchError.message.includes('404')) {
+            console.warn('Ошибка проверки существования товара:', item.id, fetchError.message);
+          }
+        }
+        
+        if (existingItem) {
+          // Товар существует на сервере, обновляем
           try {
-            const existingItem = await supabase.fetchItemById(item.id);
-            if (existingItem) {
-              // Товар существует, обновляем
-              const serverItem = await supabase.updateItem(item.id, itemToSend);
-              await db.updateItem(item.id, { ...serverItem, synced: true });
+            const serverItem = await supabase.updateItem(item.id, itemToSend);
+            await db.updateItem(item.id, { ...serverItem, synced: true });
+            synced++;
+          } catch (updateError) {
+            // Если обновление не удалось (например, товар удален), пытаемся создать
+            if (updateError.message && updateError.message.includes('404')) {
+              console.log('Товар не найден при обновлении, пытаемся создать:', item.id);
+              try {
+                // НЕ передаем ID при создании, чтобы сервер создал новый
+                const { id: _, ...itemWithoutId } = itemToSend;
+                const serverItem = await supabase.createItem(itemWithoutId);
+                // Обновляем локальный ID на серверный
+                await db.updateItem(item.id, { ...serverItem, synced: true });
+                synced++;
+              } catch (createError) {
+                console.error('Ошибка создания товара на сервере:', createError);
+                errors++;
+              }
             } else {
-              // Товар не существует, создаем
-              const serverItem = await supabase.createItem(itemToSend);
+              console.error('Ошибка обновления товара на сервере:', item.id, updateError);
+              errors++;
+            }
+          }
+        } else {
+          // Товар не существует на сервере, создаем новый
+          try {
+            // Если ID похож на UUID и не начинается с 'xxxxxxxx', пытаемся создать с ID
+            // Если получаем ошибку 409 (дубликат), создаем без ID
+            let serverItem;
+            try {
+              serverItem = await supabase.createItem(itemToSend);
+            } catch (createError) {
+              // Если ошибка 409 (duplicate key), создаем без ID
+              if (createError.message && createError.message.includes('duplicate key')) {
+                console.log('Дубликат ID при создании товара, создаем без ID:', item.id);
+                const { id: _, ...itemWithoutId } = itemToSend;
+                serverItem = await supabase.createItem(itemWithoutId);
+              } else {
+                throw createError; // Пробрасываем другие ошибки
+              }
+            }
+            
+            // Если сервер вернул товар с другим ID, обновляем локальный ID
+            if (serverItem && serverItem.id && serverItem.id !== item.id) {
+              // Удаляем старую запись и создаем новую с серверным ID
+              await db.deleteItem(item.id);
+              await db.addItem({ ...serverItem, synced: true });
+            } else {
               await db.updateItem(item.id, { ...serverItem, synced: true });
             }
             synced++;
-          } catch (error) {
-            // Если товар не найден, создаем новый
-            try {
-              const serverItem = await supabase.createItem(itemToSend);
-              await db.updateItem(item.id, { ...serverItem, synced: true });
-              synced++;
-            } catch (createError) {
-              console.error('Ошибка создания товара на сервере:', createError);
-              errors++;
-            }
+          } catch (createError) {
+            console.error('Ошибка создания товара на сервере:', item.id, createError);
+            errors++;
           }
         }
       } catch (error) {

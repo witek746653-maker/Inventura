@@ -9,16 +9,18 @@
 // Название базы данных
 const DB_NAME = 'InventuraDB';
 // Версия базы данных (увеличиваем при изменении структуры)
-const DB_VERSION = 1;
+const DB_VERSION = 5;
 
 // Названия хранилищ (таблиц) в базе данных
 const STORES = {
   ITEMS: 'items',                    // Товары
   INVENTORY_SESSIONS: 'sessions',    // Сессии инвентаризации
-  INVENTORY_ITEMS: 'inventory_items'  // Записи инвентаризации
+  INVENTORY_ITEMS: 'inventory_items',  // Записи инвентаризации
+  INVENTORY_REPORTS: 'inventory_reports'  // Отчеты инвентаризации
 };
 
 let db = null; // Переменная для хранения подключения к базе данных
+let isDeleting = false; // Флаг для предотвращения бесконечной рекурсии при удалении базы
 
 /**
  * Инициализация базы данных
@@ -28,13 +30,121 @@ let db = null; // Переменная для хранения подключе�
  */
 export async function initDB() {
   return new Promise((resolve, reject) => {
-    // Открываем базу данных (создаст, если не существует)
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    // Сначала проверяем, не открыта ли база уже
+    if (db) {
+      // Если база уже открыта, проверяем её версию и наличие всех хранилищ
+      if (db.version === DB_VERSION && db.objectStoreNames.contains(STORES.INVENTORY_REPORTS)) {
+        resolve(db);
+        return;
+      } else {
+        // Если версия не совпадает или отсутствует хранилище, закрываем и переоткрываем
+        console.log('База данных требует обновления. Версия:', db.version, 'Требуется:', DB_VERSION);
+        console.log('Хранилище отчетов:', db.objectStoreNames.contains(STORES.INVENTORY_REPORTS) ? 'есть' : 'отсутствует');
+        db.close();
+        db = null;
+      }
+    }
+
+    // Функция для обработки ошибки версии
+    // Автоматически удаляет базу и создает новую при конфликте версий
+    const handleVersionError = () => {
+      // Защита от бесконечной рекурсии
+      if (isDeleting) {
+        console.error('Попытка удаления базы уже выполняется. Ждем...');
+        // Ждем и пробуем снова
+        setTimeout(() => {
+          initDB().then(resolve).catch(reject);
+        }, 500);
+        return;
+      }
+      
+      isDeleting = true;
+      console.warn('Обнаружен конфликт версий базы данных. Автоматически исправляем...');
+      
+      // Закрываем текущее подключение, если оно есть
+      if (db) {
+        db.close();
+        db = null;
+      }
+      
+      // Удаляем базу данных при конфликте версий
+      const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
+      
+      deleteRequest.onsuccess = () => {
+        console.log('База данных удалена. Создаем новую с версией', DB_VERSION);
+        isDeleting = false;
+        // Небольшая задержка перед повторной попыткой
+        setTimeout(() => {
+          initDB().then(resolve).catch(reject);
+        }, 100);
+      };
+      
+      deleteRequest.onerror = (deleteEvent) => {
+        const deleteError = deleteRequest.error || deleteEvent.target.error;
+        console.error('Не удалось удалить базу данных:', deleteError);
+        // Пытаемся еще раз через задержку
+        setTimeout(() => {
+          const retryDelete = indexedDB.deleteDatabase(DB_NAME);
+          retryDelete.onsuccess = () => {
+            isDeleting = false;
+            setTimeout(() => {
+              initDB().then(resolve).catch(reject);
+            }, 100);
+          };
+          retryDelete.onerror = () => {
+            isDeleting = false;
+            reject(new Error('Не удалось удалить базу данных. Закройте другие вкладки и обновите страницу (Ctrl+R).'));
+          };
+        }, 500);
+      };
+      
+      deleteRequest.onblocked = () => {
+        console.warn('База данных заблокирована. Закройте другие вкладки и попробуйте снова.');
+        // Пытаемся удалить через задержку
+        setTimeout(() => {
+          const retryDelete = indexedDB.deleteDatabase(DB_NAME);
+          retryDelete.onsuccess = () => {
+            console.log('База данных удалена после повторной попытки');
+            isDeleting = false;
+            setTimeout(() => {
+              initDB().then(resolve).catch(reject);
+            }, 100);
+          };
+          retryDelete.onerror = () => {
+            isDeleting = false;
+            reject(new Error('Не удалось удалить базу данных. Закройте другие вкладки и обновите страницу (Ctrl+R).'));
+          };
+        }, 1000);
+      };
+    };
+
+    let request;
+    try {
+      // Открываем базу данных (создаст, если не существует)
+      request = indexedDB.open(DB_NAME, DB_VERSION);
+    } catch (error) {
+      // Если ошибка версии возникла сразу при вызове open()
+      if (error && (error.name === 'VersionError' || error.message?.includes('version') || error.message?.includes('less than'))) {
+        handleVersionError();
+        return;
+      }
+      reject(error);
+      return;
+    }
 
     // Вызывается при ошибке
-    request.onerror = () => {
-      console.error('Ошибка открытия базы данных:', request.error);
-      reject(request.error);
+    request.onerror = (event) => {
+      const error = request.error || event.target.error;
+      console.error('Ошибка открытия базы данных:', error);
+      
+      // Если ошибка версии (запрашиваемая версия меньше существующей),
+      // обрабатываем её специальным образом
+      if (error && (error.name === 'VersionError' || error.message?.includes('version') || error.message?.includes('less than'))) {
+        handleVersionError();
+        return;
+      }
+      
+      reject(error);
     };
 
     // Вызывается при успешном открытии
@@ -48,39 +158,78 @@ export async function initDB() {
     request.onupgradeneeded = (event) => {
       const database = event.target.result;
 
-      // Создаем хранилище для товаров
-      if (!database.objectStoreNames.contains(STORES.ITEMS)) {
-        const itemsStore = database.createObjectStore(STORES.ITEMS, {
-          keyPath: 'id',           // id будет ключом
-          autoIncrement: false     // id генерируем сами
-        });
-        // Создаем индексы для быстрого поиска
-        itemsStore.createIndex('category', 'category', { unique: false });
-        itemsStore.createIndex('location', 'location', { unique: false });
-        itemsStore.createIndex('name', 'name', { unique: false });
-      }
+      try {
+        // Создаем хранилище для товаров
+        if (!database.objectStoreNames.contains(STORES.ITEMS)) {
+          const itemsStore = database.createObjectStore(STORES.ITEMS, {
+            keyPath: 'id',           // id будет ключом
+            autoIncrement: false     // id генерируем сами
+          });
+          // Создаем индексы для быстрого поиска
+          if (!itemsStore.indexNames.contains('category')) {
+            itemsStore.createIndex('category', 'category', { unique: false });
+          }
+          if (!itemsStore.indexNames.contains('location')) {
+            itemsStore.createIndex('location', 'location', { unique: false });
+          }
+          if (!itemsStore.indexNames.contains('name')) {
+            itemsStore.createIndex('name', 'name', { unique: false });
+          }
+        }
 
-      // Создаем хранилище для сессий инвентаризации
-      if (!database.objectStoreNames.contains(STORES.INVENTORY_SESSIONS)) {
-        const sessionsStore = database.createObjectStore(STORES.INVENTORY_SESSIONS, {
-          keyPath: 'id',
-          autoIncrement: false
-        });
-        sessionsStore.createIndex('date', 'date', { unique: false });
-        sessionsStore.createIndex('status', 'status', { unique: false });
-      }
+        // Создаем хранилище для сессий инвентаризации
+        if (!database.objectStoreNames.contains(STORES.INVENTORY_SESSIONS)) {
+          const sessionsStore = database.createObjectStore(STORES.INVENTORY_SESSIONS, {
+            keyPath: 'id',
+            autoIncrement: false
+          });
+          if (!sessionsStore.indexNames.contains('date')) {
+            sessionsStore.createIndex('date', 'date', { unique: false });
+          }
+          if (!sessionsStore.indexNames.contains('status')) {
+            sessionsStore.createIndex('status', 'status', { unique: false });
+          }
+        }
 
-      // Создаем хранилище для записей инвентаризации
-      if (!database.objectStoreNames.contains(STORES.INVENTORY_ITEMS)) {
-        const inventoryItemsStore = database.createObjectStore(STORES.INVENTORY_ITEMS, {
-          keyPath: 'id',
-          autoIncrement: false
-        });
-        inventoryItemsStore.createIndex('session_id', 'session_id', { unique: false });
-        inventoryItemsStore.createIndex('item_id', 'item_id', { unique: false });
-      }
+        // Создаем хранилище для записей инвентаризации
+        if (!database.objectStoreNames.contains(STORES.INVENTORY_ITEMS)) {
+          const inventoryItemsStore = database.createObjectStore(STORES.INVENTORY_ITEMS, {
+            keyPath: 'id',
+            autoIncrement: false
+          });
+          if (!inventoryItemsStore.indexNames.contains('session_id')) {
+            inventoryItemsStore.createIndex('session_id', 'session_id', { unique: false });
+          }
+          if (!inventoryItemsStore.indexNames.contains('item_id')) {
+            inventoryItemsStore.createIndex('item_id', 'item_id', { unique: false });
+          }
+        }
 
-      console.log('База данных создана/обновлена');
+        // Создаем хранилище для отчетов инвентаризации
+        if (!database.objectStoreNames.contains(STORES.INVENTORY_REPORTS)) {
+          const reportsStore = database.createObjectStore(STORES.INVENTORY_REPORTS, {
+            keyPath: 'id',
+            autoIncrement: false
+          });
+          if (!reportsStore.indexNames.contains('session_id')) {
+            reportsStore.createIndex('session_id', 'session_id', { unique: false });
+          }
+          if (!reportsStore.indexNames.contains('date')) {
+            reportsStore.createIndex('date', 'date', { unique: false });
+          }
+        }
+
+        console.log('База данных создана/обновлена');
+      } catch (upgradeError) {
+        console.error('Ошибка при обновлении базы данных:', upgradeError);
+        // Если ошибка при обновлении, отклоняем Promise
+        reject(upgradeError);
+      }
+    };
+    
+    // Обработка ошибок при обновлении (дополнительная защита)
+    request.onblocked = () => {
+      console.warn('Обновление базы данных заблокировано. Закройте другие вкладки.');
     };
   });
 }
@@ -93,6 +242,17 @@ export async function initDB() {
  */
 async function getDB() {
   if (db) {
+    // Проверяем, что все необходимые хранилища существуют
+    if (!db.objectStoreNames.contains(STORES.INVENTORY_REPORTS)) {
+      // Если хранилища нет, нужно переоткрыть базу с обновлением версии
+      console.warn('Хранилище отчетов не найдено. Версия БД:', db.version, 'Требуется:', DB_VERSION);
+      console.warn('Переоткрываем базу данных для обновления...');
+      db.close();
+      db = null;
+      // Небольшая задержка перед переоткрытием
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return await initDB();
+    }
     return db;
   }
   return await initDB();
@@ -539,6 +699,178 @@ export async function markAsSynced(storeName, id) {
       
       putRequest.onsuccess = () => {
         resolve();
+      };
+      
+      putRequest.onerror = () => {
+        reject(putRequest.error);
+      };
+    };
+    
+    getRequest.onerror = () => {
+      reject(getRequest.error);
+    };
+  });
+}
+
+/**
+ * Добавить отчет инвентаризации
+ * 
+ * @param {Object} report - Объект отчета
+ * @returns {Promise} - Promise с результатом операции
+ */
+export async function addInventoryReport(report) {
+  let database = await getDB();
+  
+  // Проверяем существование хранилища
+  if (!database.objectStoreNames.contains(STORES.INVENTORY_REPORTS)) {
+    console.error('Хранилище отчетов не найдено в базе данных!');
+    console.error('Попытка переоткрытия базы...');
+    db = null;
+    database = await initDB();
+    
+    if (!database.objectStoreNames.contains(STORES.INVENTORY_REPORTS)) {
+      const error = new Error('Хранилище отчетов не может быть создано. Пожалуйста, обновите страницу (Ctrl+R или F5) для обновления базы данных.');
+      console.error(error.message);
+      throw error;
+    }
+  }
+  
+  return new Promise((resolve, reject) => {
+    try {
+      const transaction = database.transaction([STORES.INVENTORY_REPORTS], 'readwrite');
+      const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
+      
+      const reportWithMeta = {
+        ...report,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        synced: false
+      };
+      
+      const request = store.add(reportWithMeta);
+      
+      request.onsuccess = () => {
+        console.log('Отчет добавлен локально:', reportWithMeta);
+        resolve(reportWithMeta);
+      };
+      
+      request.onerror = () => {
+        console.error('Ошибка добавления отчета:', request.error);
+        reject(request.error);
+      };
+    } catch (error) {
+      console.error('Ошибка при создании транзакции для отчета:', error);
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Получить все отчеты инвентаризации
+ * 
+ * @returns {Promise<Array>} - Promise с массивом отчетов
+ */
+export async function getAllInventoryReports() {
+  const database = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORES.INVENTORY_REPORTS], 'readonly');
+    const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
+    const request = store.getAll();
+    
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+    
+    request.onerror = () => {
+      console.error('Ошибка получения отчетов:', request.error);
+      reject(request.error);
+    };
+  });
+}
+
+/**
+ * Получить отчет по ID
+ * 
+ * @param {string} id - ID отчета
+ * @returns {Promise<Object>} - Promise с отчетом
+ */
+export async function getInventoryReportById(id) {
+  const database = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORES.INVENTORY_REPORTS], 'readonly');
+    const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
+    const request = store.get(id);
+    
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+    
+    request.onerror = () => {
+      console.error('Ошибка получения отчета:', request.error);
+      reject(request.error);
+    };
+  });
+}
+
+/**
+ * Получить отчет по ID сессии
+ * 
+ * @param {string} sessionId - ID сессии
+ * @returns {Promise<Object>} - Promise с отчетом
+ */
+export async function getInventoryReportBySessionId(sessionId) {
+  const database = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORES.INVENTORY_REPORTS], 'readonly');
+    const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
+    const index = store.index('session_id');
+    const request = index.get(sessionId);
+    
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+    
+    request.onerror = () => {
+      console.error('Ошибка получения отчета по сессии:', request.error);
+      reject(request.error);
+    };
+  });
+}
+
+/**
+ * Обновить отчет инвентаризации
+ * 
+ * @param {string} id - ID отчета
+ * @param {Object} updates - Объект с изменениями
+ * @returns {Promise} - Promise с результатом операции
+ */
+export async function updateInventoryReport(id, updates) {
+  const database = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORES.INVENTORY_REPORTS], 'readwrite');
+    const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
+    
+    const getRequest = store.get(id);
+    
+    getRequest.onsuccess = () => {
+      const report = getRequest.result;
+      if (!report) {
+        reject(new Error('Отчет не найден'));
+        return;
+      }
+      
+      const updatedReport = {
+        ...report,
+        ...updates,
+        updated_at: new Date().toISOString(),
+        synced: false
+      };
+      
+      const putRequest = store.put(updatedReport);
+      
+      putRequest.onsuccess = () => {
+        console.log('Отчет обновлен локально:', updatedReport);
+        resolve(updatedReport);
       };
       
       putRequest.onerror = () => {

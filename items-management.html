@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html class="light" lang="ru">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Управление данными</title>
+    <!-- PWA мета-теги -->
+    <meta name="theme-color" content="#2563eb"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+    <link rel="manifest" href="manifest.json"/>
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.svg"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2563eb",
+                        "primary-dark": "#1d4ed8",
+                        "background-light": "#f1f5f9",
+                        "background-dark": "#0f172a",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#1e293b",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.375rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "3xl": "1.5rem"},
+                },
+            },
+        }
+    </script>
+    <style>
+        .hide-scroll::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scroll {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        body {
+            min-height: max(884px, 100dvh);
+            overscroll-behavior-y: none; 
+        }
+        
+        /* Стили для модального окна прогресса */
+        .progress-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .progress-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .progress-modal-content {
+            background: white;
+            border-radius: 1.5rem;
+            padding: 2rem;
+            width: 90%;
+            max-width: 320px;
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        .progress-modal.active .progress-modal-content {
+            transform: scale(1);
+        }
+        .dark .progress-modal-content {
+            background: #1e293b;
+        }
+        
+        /* Линейный прогресс-бар */
+        .linear-progress {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 9999px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        .dark .linear-progress {
+            background: #334155;
+        }
+        .linear-progress .bar {
+            height: 100%;
+            background: #2563eb;
+            border-radius: 9999px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        .linear-progress.red .bar {
+            background: #ef4444;
+        }
+        
+        /* Анимация пульсации для иконки */
+        @keyframes pulse-scale {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .pulse-icon {
+            animation: pulse-scale 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display antialiased text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    <div class="relative flex min-h-screen w-full flex-col max-w-md lg:max-w-7xl mx-auto bg-background-light dark:bg-background-dark overflow-hidden shadow-2xl lg:shadow-none border-x border-slate-200 dark:border-slate-800 lg:border-x-0">
+        
+        <!-- Header -->
+        <div class="sticky top-0 z-50 bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors shadow-sm">
+            <div class="flex items-center justify-between px-4 h-16">
+                <button class="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-white transition-colors active:scale-95" data-navigate="index.html">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </button>
+                <div class="flex flex-col items-center">
+                    <h1 class="text-base font-bold leading-tight">Управление данными</h1>
+                    <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Экспорт / Импорт / Удаление</span>
+                </div>
+                <button class="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-white transition-colors active:scale-95" id="help-btn">
+                    <span class="material-symbols-outlined">help</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 overflow-y-auto pb-24 hide-scroll">
+            <div class="px-4 py-6 space-y-5">
+                
+                <!-- Info Banner -->
+                <div class="flex items-start gap-3 px-3 py-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30">
+                    <span class="material-symbols-outlined text-primary text-lg mt-0.5">info</span>
+                    <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                        Управление базой данных инвентаризации. Выберите нужную операцию ниже.
+                    </p>
+                </div>
+
+                <!-- Export Card -->
+                <div class="bg-surface-light dark:bg-surface-dark rounded-3xl p-5 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-xl hover:scale-[1.01] transition-all group active:scale-[0.99]" id="export-card">
+                    <div class="flex items-start gap-4">
+                        <div class="size-14 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors">
+                            <span class="material-symbols-outlined text-primary text-3xl group-hover:scale-110 transition-transform">download</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-1">Экспорт данных</h2>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 leading-snug">
+                                Скачать всю базу товаров в формате Excel (.xlsx) для резервной копии или отчетности.
+                            </p>
+                        </div>
+                        <span class="material-symbols-outlined text-slate-300 dark:text-slate-600 group-hover:text-primary transition-colors">chevron_right</span>
+                    </div>
+                </div>
+
+                <!-- Import Card -->
+                <div class="bg-surface-light dark:bg-surface-dark rounded-3xl p-5 shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-xl hover:scale-[1.01] transition-all group active:scale-[0.99]" id="import-card" data-navigate="items-import.html">
+                    <div class="flex items-start gap-4">
+                        <div class="size-14 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/40 transition-colors">
+                            <span class="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-3xl group-hover:scale-110 transition-transform">upload_file</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-1">Импорт данных</h2>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 leading-snug">
+                                Загрузить товары из файла Excel (.xlsx) или CSV. Проверка дубликатов и ошибок.
+                            </p>
+                        </div>
+                        <span class="material-symbols-outlined text-slate-300 dark:text-slate-600 group-hover:text-emerald-500 transition-colors">chevron_right</span>
+                    </div>
+                </div>
+
+                <!-- Delete Card -->
+                <div class="bg-red-50 dark:bg-red-900/10 rounded-3xl p-5 shadow-lg border border-red-100 dark:border-red-900/20 cursor-pointer hover:shadow-xl hover:scale-[1.01] transition-all group active:scale-[0.99]" id="delete-card">
+                    <div class="flex items-start gap-4">
+                        <div class="size-14 rounded-2xl bg-white dark:bg-red-950 flex items-center justify-center shrink-0 shadow-sm border border-red-100 dark:border-red-900/30 group-hover:bg-red-50 dark:group-hover:bg-red-900/40 transition-colors">
+                            <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-3xl group-hover:scale-110 transition-transform">delete_forever</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-1">Удалить все данные</h2>
+                            <p class="text-sm text-red-600/80 dark:text-red-300 leading-snug">
+                                Полная очистка базы данных товаров локально и на сервере. 
+                                <span class="font-semibold text-red-700 dark:text-red-200">Это действие необратимо!</span>
+                            </p>
+                        </div>
+                        <span class="material-symbols-outlined text-red-300 dark:text-red-800 group-hover:text-red-500 transition-colors">chevron_right</span>
+                    </div>
+                </div>
+
+                <!-- Stats Section -->
+                <div class="bg-surface-light dark:bg-surface-dark rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">Статистика базы данных</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
+                            <div class="text-2xl font-bold text-slate-900 dark:text-white" id="stats-items-count">—</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">Товаров</div>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
+                            <div class="text-2xl font-bold text-slate-900 dark:text-white" id="stats-categories-count">—</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">Категорий</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="fixed bottom-0 left-0 w-full bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 h-[80px] z-[100] shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)]">
+            <div class="flex justify-between items-center max-w-md mx-auto h-full pb-4">
+                <button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="index.html" data-nav-page="index">
+                    <span class="material-symbols-outlined text-[26px]">dashboard</span>
+                    <span class="text-[10px] font-medium">Главная</span>
+                </button>
+                <button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="items.html" data-nav-page="items">
+                    <span class="material-symbols-outlined text-[26px]">list_alt</span>
+                    <span class="text-[10px] font-medium">Список</span>
+                </button>
+                <button class="flex flex-col items-center justify-center gap-1 w-16 text-primary nav-button" data-nav-page="management">
+                    <span class="material-symbols-outlined filled-icon text-[26px]">settings</span>
+                    <span class="text-[10px] font-medium">Данные</span>
+                </button>
+                <button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="inventory-history.html" data-nav-page="history">
+                    <span class="material-symbols-outlined text-[26px]">bar_chart</span>
+                    <span class="text-[10px] font-medium">Отчеты</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Progress Modal (скрыто по умолчанию) -->
+    <div class="progress-modal" id="progress-modal">
+        <div class="progress-modal-content">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-base font-bold text-slate-900 dark:text-white" id="progress-title">Обработка...</h3>
+                <span class="text-base font-bold text-slate-900 dark:text-white" id="progress-percentage">0%</span>
+            </div>
+            <div class="linear-progress" id="linear-progress">
+                <div class="bar" id="progress-bar"></div>
+            </div>
+            <p class="text-sm text-slate-500 dark:text-slate-400 text-left" id="progress-subtitle">Пожалуйста, подождите</p>
+            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1 text-left" id="progress-time"></p>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal (скрыто по умолчанию) -->
+    <div class="progress-modal" id="confirm-delete-modal">
+        <div class="progress-modal-content">
+            <div class="size-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+                <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-4xl">warning</span>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">Удалить все данные?</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                Это действие удалит <strong>все товары</strong> из локальной базы и с сервера. 
+                <span class="text-red-600 dark:text-red-400 font-semibold">Восстановить данные будет невозможно!</span>
+            </p>
+            <div class="flex gap-3">
+                <button class="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors" id="cancel-delete-btn">
+                    Отмена
+                </button>
+                <button class="flex-1 py-3 px-4 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 transition-colors" id="confirm-delete-btn">
+                    Удалить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal (скрыто по умолчанию) -->
+    <div class="progress-modal" id="success-modal">
+        <div class="progress-modal-content">
+            <div class="size-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
+                <span class="material-symbols-outlined text-green-600 dark:text-green-400 text-4xl">check_circle</span>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2" id="success-title">Готово!</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-4" id="success-message">Операция успешно завершена.</p>
+            <button class="w-full py-3 px-4 rounded-xl bg-primary text-white font-bold hover:bg-blue-600 transition-colors" id="success-ok-btn">
+                Отлично
+            </button>
+        </div>
+    </div>
+
+    <!-- Подключение библиотеки для работы с Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Подключение библиотеки для работы с ZIP (для извлечения изображений из Excel) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- Подключение JavaScript модулей -->
+    <script type="module" src="js/app.js?v=4.0"></script>
+    <!-- Регистрация Service Worker для PWA -->
+    <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('Service Worker зарегистрирован:', reg.scope))
+          .catch(err => console.log('Service Worker ошибка:', err));
+      });
+    }
+    </script>
+</body>
+</html>

@@ -7,6 +7,7 @@
 
 import * as db from './db.js';
 import * as supabase from './supabase.js';
+import * as items from './items.js';
 
 /**
  * Генерировать уникальный ID
@@ -217,7 +218,11 @@ export async function addOrUpdateInventoryItem(sessionId, itemId, quantity, prev
         await db.updateInventoryItem(inventoryItem.id, { ...serverItem, synced: true });
         return { ...serverItem, synced: true };
       } catch (syncError) {
-        console.warn('Не удалось синхронизировать создание записи:', syncError);
+        // Тихо игнорируем ошибки синхронизации - товар сохранен локально
+        // Синхронизация произойдет позже автоматически
+        if (syncError.message && !syncError.message.includes('Таймаут')) {
+          // Логируем только не-таймауты, чтобы не засорять консоль
+        }
         return localItem;
       }
     }
@@ -313,6 +318,151 @@ export async function updateSessionItemsCount(sessionId) {
     });
   } catch (error) {
     console.error('Ошибка обновления количества товаров:', error);
+    throw error;
+  }
+}
+
+/**
+ * Создать отчет по инвентаризации
+ * 
+ * @param {string} sessionId - ID сессии
+ * @returns {Promise<Object>} - Promise с созданным отчетом
+ */
+export async function createInventoryReport(sessionId) {
+  try {
+    // Получаем сессию
+    const session = await getInventorySessionById(sessionId);
+    if (!session) {
+      throw new Error('Сессия не найдена');
+    }
+    
+    // Получаем все записи инвентаризации для этой сессии
+    const inventoryItems = await getInventoryItemsBySession(sessionId);
+    
+    // Получаем все товары для расчета статистики
+    const allItems = await items.getAllItems();
+    
+    // Вычисляем статистику
+    const totalItems = inventoryItems.length;
+    const itemsWithDifference = inventoryItems.filter(item => 
+      item.difference !== null && item.difference !== 0
+    ).length;
+    const positiveDifference = inventoryItems.filter(item => 
+      item.difference !== null && item.difference > 0
+    ).length;
+    const negativeDifference = inventoryItems.filter(item => 
+      item.difference !== null && item.difference < 0
+    ).length;
+    
+    // Создаем отчет
+    const report = {
+      id: generateId(),
+      session_id: sessionId,
+      date: session.date,
+      total_items: totalItems,
+      items_with_difference: itemsWithDifference,
+      positive_difference: positiveDifference,
+      negative_difference: negativeDifference,
+      items: inventoryItems.map(item => ({
+        item_id: item.item_id,
+        item_name: allItems.find(i => i.id === item.item_id)?.name || 'Неизвестный товар',
+        quantity: item.quantity,
+        previous_quantity: item.previous_quantity,
+        difference: item.difference,
+        comment: item.comment
+      }))
+    };
+    
+    // Сохраняем локально
+    const localReport = await db.addInventoryReport(report);
+    
+    // Пытаемся синхронизировать с сервером
+    try {
+      const serverReport = await supabase.createInventoryReport(report);
+      await db.updateInventoryReport(report.id, { ...serverReport, synced: true });
+      return { ...serverReport, synced: true };
+    } catch (syncError) {
+      console.warn('Не удалось синхронизировать отчет с сервером:', syncError);
+      return localReport;
+    }
+  } catch (error) {
+    console.error('Ошибка создания отчета:', error);
+    throw error;
+  }
+}
+
+/**
+ * Получить все отчеты инвентаризации
+ * 
+ * @returns {Promise<Array>} - Promise с массивом отчетов
+ */
+export async function getAllInventoryReports() {
+  try {
+    const localReports = await db.getAllInventoryReports();
+    
+    try {
+      const serverReports = await supabase.fetchAllInventoryReports();
+      
+      // Объединяем данные
+      const reportsMap = new Map();
+      
+      serverReports.forEach(report => {
+        reportsMap.set(report.id, { ...report, synced: true });
+      });
+      
+      localReports.forEach(report => {
+        if (!reportsMap.has(report.id)) {
+          reportsMap.set(report.id, report);
+        }
+      });
+      
+      // Обновляем локальную базу
+      for (const report of serverReports) {
+        await db.updateInventoryReport(report.id, { ...report, synced: true }).catch(() => {
+          db.addInventoryReport({ ...report, synced: true }).catch(() => {});
+        });
+      }
+      
+      return Array.from(reportsMap.values());
+    } catch (syncError) {
+      console.warn('Не удалось получить отчеты с сервера:', syncError);
+      return localReports;
+    }
+  } catch (error) {
+    console.error('Ошибка получения отчетов:', error);
+    throw error;
+  }
+}
+
+/**
+ * Получить отчет по ID
+ * 
+ * @param {string} id - ID отчета
+ * @returns {Promise<Object>} - Promise с отчетом
+ */
+export async function getInventoryReportById(id) {
+  try {
+    let report = await db.getInventoryReportById(id);
+    
+    if (!report || !report.synced) {
+      try {
+        const serverReport = await supabase.fetchInventoryReportById(id);
+        if (serverReport) {
+          if (report) {
+            await db.updateInventoryReport(id, { ...serverReport, synced: true });
+          } else {
+            await db.addInventoryReport({ ...serverReport, synced: true });
+          }
+          return { ...serverReport, synced: true };
+        }
+      } catch (syncError) {
+        console.warn('Не удалось получить отчет с сервера:', syncError);
+      }
+    }
+    
+    return report;
+  } catch (error) {
+    console.error('Ошибка получения отчета:', error);
     throw error;
   }
 }

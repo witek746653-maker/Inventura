@@ -1,0 +1,25 @@
+<!-- Иконка приложения 512x512 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#137fec"/>
+  <circle cx="256" cy="256" r="80" fill="none" stroke="#d4b87a" stroke-width="8"/>
+  <g fill="none" stroke="#d4b87a" stroke-width="6" stroke-linecap="round">
+    <line x1="256" y1="80" x2="256" y2="140"/>
+    <line x1="256" y1="372" x2="256" y2="432"/>
+    <line x1="80" y1="256" x2="140" y2="256"/>
+    <line x1="372" y1="256" x2="432" y2="256"/>
+    <line x1="131" y1="131" x2="174" y2="174"/>
+    <line x1="338" y1="338" x2="381" y2="381"/>
+    <line x1="381" y1="131" x2="338" y2="174"/>
+    <line x1="131" y1="381" x2="174" y2="338"/>
+    <line x1="168" y1="92" x2="186" y2="146"/>
+    <line x1="344" y1="92" x2="326" y2="146"/>
+    <line x1="92" y1="168" x2="146" y2="186"/>
+    <line x1="92" y1="344" x2="146" y2="326"/>
+    <line x1="420" y1="168" x2="366" y2="186"/>
+    <line x1="420" y1="344" x2="366" y2="326"/>
+    <line x1="168" y1="420" x2="186" y2="366"/>
+    <line x1="344" y1="420" x2="326" y2="366"/>
+  </g>
+  <text x="256" y="280" font-family="Georgia, serif" font-size="100" font-weight="bold" fill="#d4b87a" text-anchor="middle">S</text>
+</svg>
+

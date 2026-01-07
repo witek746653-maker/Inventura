@@ -4,6 +4,14 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Главный экран инвентаризации</title>
+<!-- PWA мета-теги -->
+<meta name="theme-color" content="#137fec"/>
+<meta name="description" content="Приложение для инвентаризации ресторана Sabor de la Vida"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="Инвентура"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="assets/icons/icon-192.svg"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script id="tailwind-config">
@@ -56,24 +64,10 @@
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark min-h-screen text-slate-900 dark:text-slate-100 flex flex-col font-display selection:bg-primary/30">
-<header class="sticky top-0 z-50 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-<div class="flex items-center gap-3">
-<button class="flex items-center justify-center w-10 h-10 rounded-full bg-surface-light dark:bg-surface-dark shadow-sm text-slate-700 dark:text-slate-300">
-<span class="material-symbols-outlined">menu</span>
-</button>
-<div>
-<h1 class="text-base font-bold leading-tight">Ресторан "Олива"</h1>
-<p class="text-xs text-slate-500 dark:text-slate-400">Менеджер: Алексей</p>
-</div>
-</div>
-<div class="flex items-center gap-2">
-<button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors">
-<span class="material-symbols-outlined">notifications</span>
-</button>
-<div class="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border-2 border-surface-light dark:border-surface-dark shadow-sm">
-<div class="w-full h-full bg-cover bg-center" data-alt="Profile picture of a restaurant manager" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCWeBqwZ8Waiq4jVDY468lDVGmLsgJ60UhDgezCDPFg8NYQPLoXys7d08a5dOT3RNGjOf4lVPzCIT-cZBjxXFvc9wFlQEe-wSdwvlfWEyi3nTR53d3p59Cor263MbUmzSGC3cV15lNUZ-9vefCEbQHoi12L92D4-zg3qQYAdlWCN-Pm1lyK8dyJEiyp2Obn1CoBA4xkdTsHhXLbUqtcfzp7r6Mpf1CK1hXRI7vP7XOPR5NI3VKJENCH3Mcs8cGZSzTLlvoewTcoFTD3');"></div>
-</div>
-</div>
+<div class="w-full max-w-7xl mx-auto flex-1 flex flex-col">
+<!-- Шапка с логотипом ресторана -->
+<header class="sticky top-0 z-50 bg-white dark:bg-surface-dark px-4 py-4 flex items-center justify-center border-b border-slate-200 dark:border-slate-800">
+<img src="assets/images/logo-sabor.png" alt="Sabor de la Vida - Ресторан" class="h-16 md:h-20 object-contain">
 </header>
 <main class="flex-1 px-4 pb-28 pt-4 flex flex-col gap-6 overflow-y-auto no-scrollbar">
 <section>
@@ -111,9 +105,13 @@
 <span class="material-symbols-outlined filled-icon">play_arrow</span>
 Продолжить
 </button>
+<button class="w-full h-14 bg-red-500 hover:bg-red-600 active:scale-[0.98] transition-all rounded-xl flex items-center justify-center gap-2 text-white font-bold text-lg shadow-lg shadow-red-500/30 mt-2" data-complete-session style="display: none;">
+<span class="material-symbols-outlined filled-icon">stop</span>
+Закончить инвентаризацию
+</button>
 <button class="w-full h-14 bg-primary hover:bg-blue-600 active:scale-[0.98] transition-all rounded-xl flex items-center justify-center gap-2 text-white font-bold text-lg shadow-lg shadow-blue-500/30 mt-2" data-new-session style="display: none;">
-<span class="material-symbols-outlined filled-icon">add</span>
-Начать новую инвентаризацию
+<span class="material-symbols-outlined filled-icon">play_arrow</span>
+Начать
 </button>
 </div>
 </section>
@@ -159,25 +157,56 @@
 </div>
 </section>
 </main>
-<nav class="fixed bottom-0 left-0 w-full bg-surface-light dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 h-[80px] z-40 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.05)]">
+</div>
+<nav class="fixed bottom-0 left-0 w-full bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 h-[80px] z-[100] shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)]">
 <div class="flex justify-between items-center max-w-md mx-auto h-full pb-4">
-<button class="flex flex-col items-center justify-center gap-1 w-16 text-primary">
+<button class="flex flex-col items-center justify-center gap-1 w-16 text-primary nav-button" data-nav-page="index">
 <span class="material-symbols-outlined filled-icon text-[26px]">dashboard</span>
 <span class="text-[10px] font-medium">Главная</span>
 </button>
-<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors" data-navigate="items.html">
+<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="items.html" data-nav-page="items">
 <span class="material-symbols-outlined text-[26px]">list_alt</span>
-<span class="text-[10px] font-medium">Товары</span>
+<span class="text-[10px] font-medium">Список</span>
 </button>
-<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors" data-navigate="inventory-history.html">
+<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="items-management.html" data-nav-page="management">
+<span class="material-symbols-outlined text-[26px]">settings</span>
+<span class="text-[10px] font-medium">Данные</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="inventory-history.html" data-nav-page="history">
 <span class="material-symbols-outlined text-[26px]">bar_chart</span>
 <span class="text-[10px] font-medium">Отчеты</span>
 </button>
 </div>
 </nav>
 
+<!-- Модальное окно для завершения инвентаризации и формирования отчета -->
+<div id="complete-modal" class="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center flex">
+<div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl">
+<h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Завершить инвентаризацию?</h3>
+<p class="text-sm text-slate-600 dark:text-slate-400 mb-6">Вы хотите завершить текущую инвентаризацию и сформировать отчет?</p>
+<div class="flex gap-3">
+<button id="complete-yes" class="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
+Сформировать отчет
+</button>
+<button id="complete-cancel" class="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
+Отмена
+</button>
+</div>
+</div>
+</div>
+
 <!-- Подключение JavaScript модулей -->
 <script type="module" src="js/app.js"></script>
+<!-- Регистрация Service Worker для PWA -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('Service Worker зарегистрирован:', reg.scope))
+      .catch(err => console.log('Service Worker ошибка:', err));
+  });
+}
+</script>
 </body>
 </html>
 

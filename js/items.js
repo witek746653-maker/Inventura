@@ -60,14 +60,28 @@ export async function createItem(itemData) {
     const localItem = await db.addItem(item);
     
     // Пытаемся синхронизировать с сервером (если есть интернет)
-    try {
-      const serverItem = await supabase.createItem(item);
-      // Обновляем локальную запись с данными с сервера
-      await db.updateItem(item.id, { ...serverItem, synced: true });
-      return { ...serverItem, synced: true };
-    } catch (syncError) {
-      // Если синхронизация не удалась, возвращаем локальную версию
-      console.warn('Не удалось синхронизировать товар с сервером:', syncError);
+    // Проверяем наличие интернета перед попыткой синхронизации
+    if (navigator.onLine) {
+      try {
+        const serverItem = await supabase.createItem(item);
+        // Обновляем локальную запись с данными с сервера
+        if (serverItem && serverItem.id) {
+          await db.updateItem(item.id, { ...serverItem, synced: true });
+          return { ...serverItem, synced: true };
+        } else {
+          // Если сервер вернул невалидные данные, оставляем локальную версию
+          console.warn('Сервер вернул невалидные данные, используем локальную версию');
+          return localItem;
+        }
+      } catch (syncError) {
+        // Если синхронизация не удалась, возвращаем локальную версию
+        // Это нормально - товар уже сохранен локально, синхронизация произойдет позже
+        console.warn('Не удалось синхронизировать товар с сервером:', syncError.message || syncError);
+        return localItem;
+      }
+    } else {
+      // Нет интернета - просто возвращаем локальную версию
+      console.log('Нет интернета, товар сохранен только локально');
       return localItem;
     }
   } catch (error) {
@@ -91,27 +105,48 @@ export async function getAllItems() {
     try {
       const serverItems = await supabase.fetchAllItems();
       
-      // Объединяем данные: приоритет у серверных данных
+      // Объединяем данные: приоритет у ЛОКАЛЬНЫХ несинхронизированных изменений
       const itemsMap = new Map();
       
-      // Сначала добавляем серверные товары
+      // Сначала добавляем серверные товары (как базу)
       serverItems.forEach(item => {
         itemsMap.set(item.id, { ...item, synced: true });
       });
       
-      // Затем добавляем локальные товары, которых нет на сервере
+      // Затем добавляем/обновляем локальными товарами
+      // Локальные товары с synced: false имеют приоритет (не перезаписываются серверными)
       localItems.forEach(item => {
-        if (!itemsMap.has(item.id)) {
+        const existingItem = itemsMap.get(item.id);
+        
+        // Если товара нет на сервере, добавляем локальный
+        if (!existingItem) {
           itemsMap.set(item.id, item);
+        } 
+        // Если товар есть локально и НЕ синхронизирован, используем локальную версию
+        // Это важно для сохранения локальных изменений (например, новых image_url)
+        else if (!item.synced) {
+          // Объединяем: берем локальные изменения, но сохраняем серверные данные для других полей
+          itemsMap.set(item.id, {
+            ...existingItem, // Серверные данные как база
+            ...item, // Локальные изменения перезаписывают серверные
+            synced: false // Помечаем как не синхронизированный
+          });
         }
+        // Если товар синхронизирован, оставляем серверную версию
       });
       
-      // Обновляем локальную базу данными с сервера
+      // Обновляем локальную базу данными с сервера, НО НЕ перезаписываем несинхронизированные изменения
       for (const item of serverItems) {
-        await db.updateItem(item.id, { ...item, synced: true }).catch(() => {
-          // Если товара нет локально, добавляем его
-          db.addItem({ ...item, synced: true }).catch(() => {});
-        });
+        const localItem = localItems.find(li => li.id === item.id);
+        
+        // Обновляем только если товар синхронизирован или его нет локально
+        if (!localItem || localItem.synced) {
+          await db.updateItem(item.id, { ...item, synced: true }).catch(() => {
+            // Если товара нет локально, добавляем его
+            db.addItem({ ...item, synced: true }).catch(() => {});
+          });
+        }
+        // Если товар не синхронизирован, НЕ перезаписываем его серверными данными
       }
       
       return Array.from(itemsMap.values());
@@ -177,11 +212,22 @@ export async function updateItem(id, updates) {
     // Пытаемся синхронизировать с сервером
     try {
       const serverItem = await supabase.updateItem(id, updates);
-      // Обновляем локальную запись
-      await db.updateItem(id, { ...serverItem, synced: true });
-      return { ...serverItem, synced: true };
+      
+      // Важно: если мы обновляем image_url, убеждаемся, что он сохранился
+      // Объединяем серверный ответ с локальными изменениями
+      const mergedItem = {
+        ...serverItem,
+        // Если обновляли image_url, сохраняем его (даже если сервер вернул старую версию)
+        ...(updates.image_url && { image_url: updates.image_url }),
+        synced: true
+      };
+      
+      // Обновляем локальную запись объединенными данными
+      await db.updateItem(id, mergedItem);
+      return mergedItem;
     } catch (syncError) {
       console.warn('Не удалось синхронизировать обновление с сервером:', syncError);
+      // Возвращаем локальную версию (с synced: false)
       return localItem;
     }
   } catch (error) {
