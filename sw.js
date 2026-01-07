@@ -8,32 +8,33 @@
  */
 
 // Версия кэша — меняйте при обновлении приложения, чтобы пользователи получили новые файлы
-const CACHE_VERSION = 'v1.0.0';
+const CACHE_VERSION = 'v1.0.1';
 const CACHE_NAME = `sabor-inventura-${CACHE_VERSION}`;
 
 // Список файлов для кэширования (эти файлы будут доступны офлайн)
+// Используем относительные пути для совместимости с GitHub Pages
 const FILES_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/inventory-history.html',
-  '/inventory-session.html',
-  '/item-details.html',
-  '/items-import.html',
-  '/items-management.html',
-  '/items.html',
-  '/js/app.js',
-  '/js/db.js',
-  '/js/inventory-session.js',
-  '/js/inventory.js',
-  '/js/items.js',
-  '/js/supabase.js',
-  '/js/sync.js',
-  '/config/supabase-config.js',
-  '/assets/images/logo-sabor.png',
-  '/assets/icons/icon.svg',
-  '/assets/icons/icon-192.svg',
-  '/assets/icons/icon-512.svg',
-  '/manifest.json'
+  './',
+  './index.html',
+  './inventory-history.html',
+  './inventory-session.html',
+  './item-details.html',
+  './items-import.html',
+  './items-management.html',
+  './items.html',
+  './js/app.js',
+  './js/db.js',
+  './js/inventory-session.js',
+  './js/inventory.js',
+  './js/items.js',
+  './js/supabase.js',
+  './js/sync.js',
+  './config/supabase-config.js',
+  './assets/images/logo-sabor.png',
+  './assets/icons/icon.svg',
+  './assets/icons/icon-192.svg',
+  './assets/icons/icon-512.svg',
+  './manifest.json'
 ];
 
 /**
@@ -130,7 +131,7 @@ self.addEventListener('fetch', (event) => {
             }
             // Если нет в кэше — показываем офлайн-страницу для HTML
             if (event.request.headers.get('accept').includes('text/html')) {
-              return caches.match('/index.html');
+              return caches.match('./index.html');
             }
           });
       })
@@ -145,8 +146,8 @@ self.addEventListener('push', (event) => {
     const data = event.data.json();
     const options = {
       body: data.body || 'Новое уведомление',
-      icon: '/assets/icons/icon-192.svg',
-      badge: '/assets/icons/icon-192.svg',
+      icon: './assets/icons/icon-192.svg',
+      badge: './assets/icons/icon-192.svg',
       vibrate: [100, 50, 100],
       data: data.data || {}
     };
