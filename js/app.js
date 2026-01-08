@@ -1166,8 +1166,9 @@ function createItemElement(item) {
   const categoryColor = categoryColors[item.category] || 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 ring-slate-500/10';
   
   // Обрабатываем URL изображения: если пустой или null, используем placeholder
-  const imageUrl = (item.image_url && item.image_url.trim() !== '') 
-    ? item.image_url 
+  // Проверяем, что image_url существует И является строкой, прежде чем вызывать .trim()
+  const imageUrl = (item.image_url && typeof item.image_url === 'string' && item.image_url.trim() !== '') 
+    ? item.image_url.trim() 
     : 'https://via.placeholder.com/64';
   
   div.innerHTML = `
@@ -3190,28 +3191,9 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
   
   // Счётчик для последовательной привязки изображений к строкам с товарами
   let imageIndex = 0;
-  // Получаем все существующие товары для проверки дубликатов и уникальности
+  
+  // Получаем все существующие товары для проверки дубликатов
   const existingItems = await items.getAllItems();
-  const existingNames = new Set(existingItems.map(item => item.name.toLowerCase().trim()));
-  
-  // Списки для проверки уникальности
-  const existingSkus = new Set(existingItems.map(item => item.sku ? item.sku.toString().toLowerCase().trim() : '').filter(sku => sku));
-  const existingDescriptions = new Set(existingItems.map(item => item.description ? item.description.toLowerCase().trim() : '').filter(desc => desc));
-  const existingImageNames = new Set(existingItems.map(item => {
-    if (!item.image_url) return null;
-    // Извлекаем имя файла из URL
-    try {
-      const url = new URL(item.image_url);
-      return url.pathname.split('/').pop().toLowerCase();
-    } catch {
-      return item.image_url.split('/').pop().toLowerCase();
-    }
-  }).filter(name => name));
-  
-  // Списки для валидации
-  const VALID_CATEGORIES = ['посуда', 'бокалы', 'приборы', 'инвентарь', 'расходники', 'прочее'];
-  const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
-  const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
   
   // Импортируем функцию для загрузки изображений в Supabase Storage
   const { uploadFileToStorage } = await import('./supabase.js');
@@ -3222,10 +3204,12 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
     duplicates: []
   };
   
-  // Списки для проверки уникальности внутри импортируемых данных
+  // Set для отслеживания дубликатов внутри импортируемого файла
+  // Ключ = "название|описание|артикул|фото" (все 4 поля)
+  const importedDuplicateKeys = new Set();
+  
+  // Set для отслеживания артикулов внутри файла (для проверки конфликтов)
   const importedSkus = new Set();
-  const importedDescriptions = new Set();
-  const importedImageNames = new Set();
   
   // Маппинг русских названий столбцов на английские
   // Важно: ключи должны быть в нижнем регистре, так как заголовки нормализуются
@@ -3324,35 +3308,17 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       return;
     }
     
+    // Проверка обязательного поля: артикул
     if (!sku) {
       processed.errors.push({
         row: rowNumber,
         data: normalizedRow,
-        message: 'Отсутствует артикул (SKU). Артикул обязателен и должен быть уникальным'
+        message: 'Отсутствует артикул'
       });
       return;
     }
     
-    // Проверка уникальности артикула
-    const skuLower = sku.toLowerCase();
-    if (existingSkus.has(skuLower)) {
-      processed.errors.push({
-        row: rowNumber,
-        data: normalizedRow,
-        message: `Артикул "${sku}" уже существует в базе. Артикул должен быть уникальным`
-      });
-      return;
-    }
-    
-    if (importedSkus.has(skuLower)) {
-      processed.errors.push({
-        row: rowNumber,
-        data: normalizedRow,
-        message: `Артикул "${sku}" дублируется в импортируемом файле. Артикул должен быть уникальным`
-      });
-      return;
-    }
-    
+    // Проверка обязательного поля: категория
     if (!category) {
       processed.errors.push({
         row: rowNumber,
@@ -3362,16 +3328,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       return;
     }
     
-    // Проверка категории (только из списка)
-    if (!VALID_CATEGORIES.includes(category.toLowerCase())) {
-      processed.errors.push({
-        row: rowNumber,
-        data: normalizedRow,
-        message: `Недопустимая категория "${category}". Разрешены только: ${VALID_CATEGORIES.join(', ')}`
-      });
-      return;
-    }
-    
+    // Проверка обязательного поля: место хранения
     if (!location) {
       processed.errors.push({
         row: rowNumber,
@@ -3381,18 +3338,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       return;
     }
     
-    // Проверка места хранения (бар, кухня, склад или другое)
-    const locationLower = location.toLowerCase();
-    const validLocationLower = VALID_LOCATIONS.map(l => l.toLowerCase());
-    if (!validLocationLower.includes(locationLower) && locationLower !== 'другое' && locationLower !== 'свой вариант') {
-      processed.errors.push({
-        row: rowNumber,
-        data: normalizedRow,
-        message: `Недопустимое место хранения "${location}". Разрешены: ${VALID_LOCATIONS.join(', ')}, или "Другое"`
-      });
-      return;
-    }
-    
+    // Проверка обязательного поля: единица измерения
     if (!unit) {
       processed.errors.push({
         row: rowNumber,
@@ -3400,38 +3346,6 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
         message: 'Отсутствует единица измерения'
       });
       return;
-    }
-    
-    // Проверка единицы измерения (только из списка)
-    if (!VALID_UNITS.includes(unit)) {
-      processed.errors.push({
-        row: rowNumber,
-        data: normalizedRow,
-        message: `Недопустимая единица измерения "${unit}". Разрешены только: ${VALID_UNITS.join(', ')}`
-      });
-      return;
-    }
-    
-    // Проверка уникальности описания (если есть)
-    if (description) {
-      const descLower = description.toLowerCase();
-      if (existingDescriptions.has(descLower)) {
-        processed.errors.push({
-          row: rowNumber,
-          data: normalizedRow,
-          message: `Описание уже существует в базе. Описание должно быть уникальным`
-        });
-        return;
-      }
-      
-      if (importedDescriptions.has(descLower)) {
-        processed.errors.push({
-          row: rowNumber,
-          data: normalizedRow,
-          message: `Описание дублируется в импортируемом файле. Описание должно быть уникальным`
-        });
-        return;
-      }
     }
     
     // ВАЖНО: Обрабатываем изображения ДО проверки на дубликаты,
@@ -3561,122 +3475,224 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       console.log(`✗ Строка ${rowNumber} (${name}): изображение отсутствует, image_url = null`);
     }
     
-    // Проверка на дубликаты
-    // Проверяем по названию И по артикулу (если артикул указан)
+    // Получаем URL изображения для сравнения
+    // Для извлечённых изображений используем имя файла, для URL - сам URL
+    let currentImageIdentifier = null;
+    if (normalizedRow._extractedImage && normalizedRow._extractedImage.fileName) {
+      currentImageIdentifier = normalizedRow._extractedImage.fileName.toLowerCase();
+    } else if (imageUrl) {
+      try {
+        const url = new URL(imageUrl);
+        currentImageIdentifier = url.pathname.split('/').pop().toLowerCase();
+      } catch {
+        currentImageIdentifier = imageUrl.split('/').pop().toLowerCase();
+      }
+    }
+    
+    // Проверка на дубликаты: ПОЛНОЕ совпадение ВСЕХ 4 полей
+    // Дубликат = название + описание + артикул + фото полностью идентичны
     let isDuplicate = false;
     let existingItem = null;
     
-    // Проверяем наличие артикула (может быть строкой или числом)
-    const hasSku = normalizedRow.sku !== null && normalizedRow.sku !== undefined && normalizedRow.sku !== '';
-    if (hasSku) {
-      // Преобразуем артикул в строку для сравнения
-      const normalizedSku = String(normalizedRow.sku).trim();
+    const normalizedSku = String(sku).trim().toLowerCase();
+    const descLower = description ? description.toLowerCase() : '';
+    
+    // Сначала проверяем дубликаты в СУЩЕСТВУЮЩЕЙ базе данных
+    existingItem = existingItems.find(item => {
+      // Сравниваем название
+      const itemName = (item.name || '').toLowerCase().trim();
+      if (itemName !== name.toLowerCase()) return false;
       
-      // Если есть артикул, проверяем по артикулу
-      existingItem = existingItems.find(item => {
-        if (!item.sku) return false;
-        // Преобразуем артикул в строку для сравнения (может быть числом или строкой)
-        const itemSku = String(item.sku).trim();
-        return itemSku !== '' && itemSku.toLowerCase() === normalizedSku.toLowerCase();
-      });
-      if (existingItem) {
-        isDuplicate = true;
+      // Сравниваем описание
+      const itemDesc = (item.description || '').toLowerCase().trim();
+      if (itemDesc !== descLower) return false;
+      
+      // Сравниваем артикул
+      const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
+      if (itemSku !== normalizedSku) return false;
+      
+      // Сравниваем фото (по имени файла или URL)
+      let itemImageIdentifier = null;
+      // Проверяем, что image_url существует И является строкой
+      if (item.image_url && typeof item.image_url === 'string') {
+        try {
+          const url = new URL(item.image_url);
+          itemImageIdentifier = url.pathname.split('/').pop().toLowerCase();
+        } catch {
+          itemImageIdentifier = item.image_url.split('/').pop().toLowerCase();
+        }
       }
+      
+      // Если оба пустые - это совпадение
+      if (!currentImageIdentifier && !itemImageIdentifier) return true;
+      // Если только один пустой - не совпадение
+      if (!currentImageIdentifier || !itemImageIdentifier) return false;
+      // Сравниваем идентификаторы изображений
+      return currentImageIdentifier === itemImageIdentifier;
+    });
+    
+    if (existingItem) {
+      isDuplicate = true;
     }
     
-    // Если не нашли по артикулу, проверяем по названию
-    if (!isDuplicate && existingNames.has(name.toLowerCase())) {
-      existingItem = existingItems.find(item => 
-        item.name.toLowerCase().trim() === name.toLowerCase()
-      );
-      if (existingItem) {
-        isDuplicate = true;
+    // Если не нашли в базе, проверяем дубликаты ВНУТРИ импортируемого файла
+    if (!isDuplicate) {
+      // Создаём уникальный ключ из всех 4 полей для сравнения
+      const duplicateKey = `${name.toLowerCase()}|${descLower}|${normalizedSku}|${currentImageIdentifier || ''}`;
+      
+      if (importedDuplicateKeys.has(duplicateKey)) {
+        // Нашли дубликат внутри файла - добавляем как дубликат
+        // Находим первую запись с таким же ключом
+        const firstItem = processed.items.find(item => {
+          const itemDesc = (item.description || '').toLowerCase().trim();
+          const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
+          let itemImageId = null;
+          if (item._extractedImage && item._extractedImage.fileName) {
+            itemImageId = item._extractedImage.fileName.toLowerCase();
+          // Проверяем, что image_url существует И является строкой
+          } else if (item.image_url && typeof item.image_url === 'string') {
+            try {
+              const url = new URL(item.image_url);
+              itemImageId = url.pathname.split('/').pop().toLowerCase();
+            } catch {
+              itemImageId = item.image_url.split('/').pop().toLowerCase();
+            }
+          }
+          const itemKey = `${item.name.toLowerCase()}|${itemDesc}|${itemSku}|${itemImageId || ''}`;
+          return itemKey === duplicateKey;
+        });
+        
+        if (firstItem) {
+          processed.duplicates.push({
+            row: rowNumber,
+            data: normalizedRow,
+            existing: firstItem,
+            duplicateType: 'file' // Помечаем, что это дубликат внутри файла
+          });
+          console.log(`Дубликат в файле для "${name}" (строка ${rowNumber})`);
+          return;
+        }
       }
+      
+      // Проверяем конфликт артикулов внутри файла
+      // Если артикул уже встречался, проверяем обязательные поля
+      if (importedSkus.has(normalizedSku)) {
+        // Находим первый товар с таким артикулом
+        const firstItemWithSku = processed.items.find(item => {
+          const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
+          return itemSku === normalizedSku;
+        });
+        
+        if (firstItemWithSku) {
+          // Проверяем совпадают ли все обязательные поля
+          const itemName = (firstItemWithSku.name || '').toLowerCase().trim();
+          const itemCategory = (firstItemWithSku.category || '').toLowerCase().trim();
+          const itemLocation = (firstItemWithSku.location || '').toLowerCase().trim();
+          const itemUnit = (firstItemWithSku.unit || '').toLowerCase().trim();
+          
+          const nameMatches = itemName === name.toLowerCase();
+          const categoryMatches = itemCategory === category.toLowerCase();
+          const locationMatches = itemLocation === location.toLowerCase();
+          const unitMatches = itemUnit === unit.toLowerCase();
+          
+          // Если ВСЕ обязательные поля совпадают → это дубликат
+          if (nameMatches && categoryMatches && locationMatches && unitMatches) {
+            processed.duplicates.push({
+              row: rowNumber,
+              data: normalizedRow,
+              existing: firstItemWithSku,
+              duplicateType: 'file' // Дубликат внутри файла (по обязательным полям)
+            });
+            console.log(`Дубликат в файле (по артикулу и обязательным полям) для "${name}"`);
+            return;
+          }
+        }
+        
+        // Если обязательные поля отличаются → ошибка (конфликт артикулов)
+        processed.errors.push({
+          row: rowNumber,
+          data: normalizedRow,
+          message: `Артикул "${sku}" дублируется в файле (первый: "${firstItemWithSku?.name || 'неизвестно'}"). Артикул должен быть уникальным`
+        });
+        return;
+      }
+      
+      // Добавляем ключ для отслеживания дубликатов внутри файла
+      importedDuplicateKeys.add(duplicateKey);
+      // Добавляем артикул для отслеживания конфликтов
+      importedSkus.add(normalizedSku);
     }
     
-    // Если это дубликат, добавляем в список дубликатов и НЕ добавляем в items
+    // Если это дубликат с существующим в базе товаром
     if (isDuplicate && existingItem) {
       processed.duplicates.push({
         row: rowNumber,
-        data: normalizedRow, // normalizedRow теперь содержит image_url
-        existing: existingItem
+        data: normalizedRow,
+        existing: existingItem,
+        duplicateType: 'database' // Помечаем, что это дубликат с базой
       });
-      console.log(`Дубликат найден для "${name}":`, existingItem);
-      if (imageUrl) {
-        console.log(`  ✅ В файле есть изображение: "${imageUrl}"`);
-        console.log(`  → Изображение будет сохранено при нажатии "Обновить"`);
-      } else if (normalizedRow._extractedImage) {
-        console.log(`  ✅ Найдено встроенное изображение: "${normalizedRow._extractedImage.fileName}"`);
-        console.log(`  → Изображение будет загружено в Supabase Storage`);
-      } else {
-        console.log(`  ⚠️ В файле НЕТ изображения для этого товара`);
-        // Показываем все ключи из оригинальной строки для отладки
-        console.log(`  → Доступные колонки в файле:`, Object.keys(row));
-        // Показываем значения из колонок, похожих на изображения
-        const imageLikeKeys = Object.keys(row).filter(key => {
-          const keyLower = key.toLowerCase();
-          return keyLower.includes('фото') || keyLower.includes('image') || 
-                 keyLower.includes('photo') || keyLower.includes('img') ||
-                 keyLower.includes('изображение') || keyLower.includes('картинка') ||
-                 keyLower === 'url';
-        });
-        if (imageLikeKeys.length > 0) {
-          console.log(`  → Колонки, похожие на изображения:`, imageLikeKeys);
-          imageLikeKeys.forEach(key => {
-            console.log(`    - "${key}": "${row[key]}"`);
-          });
-        }
-      }
+      console.log(`Дубликат с базой для "${name}":`, existingItem);
       return; // НЕ добавляем дубликат в список для импорта
     }
     
-    // Проверка уникальности названия изображения (если есть)
-    if (imageUrl || normalizedRow._extractedImage) {
-      let imageName = null;
+    // Проверка: артикул совпадает с базой
+    // Если все обязательные поля идентичны → дубликат
+    // Если обязательные поля отличаются → ошибка (конфликт артикулов)
+    if (!isDuplicate) {
+      const itemWithSameSku = existingItems.find(item => {
+        const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
+        return itemSku !== '' && itemSku === normalizedSku;
+      });
       
-      if (normalizedRow._extractedImage && normalizedRow._extractedImage.fileName) {
-        // Для извлеченных изображений используем имя файла
-        imageName = normalizedRow._extractedImage.fileName.toLowerCase();
-      } else if (imageUrl) {
-        // Для URL извлекаем имя файла
-        try {
-          const url = new URL(imageUrl);
-          imageName = url.pathname.split('/').pop().toLowerCase();
-        } catch {
-          imageName = imageUrl.split('/').pop().toLowerCase();
-        }
-      }
-      
-      if (imageName) {
-        if (existingImageNames.has(imageName)) {
-          processed.errors.push({
+      if (itemWithSameSku) {
+        // Проверяем совпадают ли все обязательные поля
+        const itemName = (itemWithSameSku.name || '').toLowerCase().trim();
+        const itemCategory = (itemWithSameSku.category || '').toLowerCase().trim();
+        const itemLocation = (itemWithSameSku.location || '').toLowerCase().trim();
+        const itemUnit = (itemWithSameSku.unit || '').toLowerCase().trim();
+        
+        const nameMatches = itemName === name.toLowerCase();
+        const categoryMatches = itemCategory === category.toLowerCase();
+        const locationMatches = itemLocation === location.toLowerCase();
+        const unitMatches = itemUnit === unit.toLowerCase();
+        
+        // Логируем сравнение для отладки
+        console.log(`🔍 Сравнение с базой для артикула "${sku}":`);
+        console.log(`   Название: файл="${name}" vs база="${itemWithSameSku.name}" → ${nameMatches ? '✅' : '❌'}`);
+        console.log(`   Категория: файл="${category}" vs база="${itemWithSameSku.category}" → ${categoryMatches ? '✅' : '❌'}`);
+        console.log(`   Место: файл="${location}" vs база="${itemWithSameSku.location}" → ${locationMatches ? '✅' : '❌'}`);
+        console.log(`   Единица: файл="${unit}" vs база="${itemWithSameSku.unit}" → ${unitMatches ? '✅' : '❌'}`);
+        
+        // Если ВСЕ обязательные поля совпадают → это дубликат
+        if (nameMatches && categoryMatches && locationMatches && unitMatches) {
+          processed.duplicates.push({
             row: rowNumber,
             data: normalizedRow,
-            message: `Название изображения "${imageName}" уже используется в базе. Название изображения должно быть уникальным`
+            existing: itemWithSameSku,
+            duplicateType: 'database' // Дубликат с базой (по обязательным полям)
           });
+          console.log(`Дубликат с базой (по артикулу и обязательным полям) для "${name}":`, itemWithSameSku);
           return;
         }
         
-        if (importedImageNames.has(imageName)) {
-          processed.errors.push({
-            row: rowNumber,
-            data: normalizedRow,
-            message: `Название изображения "${imageName}" дублируется в импортируемом файле. Название изображения должно быть уникальным`
-          });
-          return;
-        }
+        // Собираем список несовпадающих полей для информативного сообщения
+        const mismatches = [];
+        if (!nameMatches) mismatches.push(`название: "${name}" ≠ "${itemWithSameSku.name}"`);
+        if (!categoryMatches) mismatches.push(`категория: "${category}" ≠ "${itemWithSameSku.category}"`);
+        if (!locationMatches) mismatches.push(`место: "${location}" ≠ "${itemWithSameSku.location}"`);
+        if (!unitMatches) mismatches.push(`единица: "${unit}" ≠ "${itemWithSameSku.unit}"`);
         
-        importedImageNames.add(imageName);
+        // Если обязательные поля отличаются → ошибка (конфликт артикулов)
+        processed.errors.push({
+          row: rowNumber,
+          data: normalizedRow,
+          message: `Артикул "${sku}" уже существует в базе. Отличия: ${mismatches.join('; ')}`
+        });
+        return;
       }
     }
     
-    // Добавляем в списки отслеживания уникальности
-    importedSkus.add(skuLower);
-    if (description) {
-      importedDescriptions.add(description.toLowerCase());
-    }
-    
-    // Добавляем валидный товар (только если это НЕ дубликат)
+    // Добавляем валидный товар (только если это НЕ дубликат и нет конфликта артикулов)
     // Сохраняем информацию об извлеченном изображении для последующей загрузки
     const itemData = {
       name: name,
@@ -4895,34 +4911,9 @@ function createErrorElement(error) {
         return;
       }
       
-      // Проверяем уникальность артикула
-      const existingItems = await items.getAllItems();
-      const existingSkus = new Set(existingItems.map(item => item.sku ? item.sku.toString().toLowerCase().trim() : '').filter(s => s));
-      const skuLower = sku.toLowerCase();
-      
-      if (existingSkus.has(skuLower)) {
-        showError(`Артикул "${sku}" уже существует в базе. Артикул должен быть уникальным`);
-        skuInput?.focus();
-        return;
-      }
-      
-      // Проверяем уникальность артикула среди уже исправленных ошибок
-      const importedSkus = new Set(importedData.items.map(item => item.sku ? item.sku.toString().toLowerCase().trim() : '').filter(s => s));
-      if (importedSkus.has(skuLower)) {
-        showError(`Артикул "${sku}" дублируется в импортируемых данных. Артикул должен быть уникальным`);
-        skuInput?.focus();
-        return;
-      }
-      
+      // Проверка обязательных полей
       if (!category) {
         showError('Выберите категорию');
-        categorySelect?.focus();
-        return;
-      }
-      
-      const VALID_CATEGORIES = ['посуда', 'бокалы', 'приборы', 'инвентарь', 'расходники', 'прочее'];
-      if (!VALID_CATEGORIES.includes(category.toLowerCase())) {
-        showError(`Недопустимая категория. Разрешены только: ${VALID_CATEGORIES.join(', ')}`);
         categorySelect?.focus();
         return;
       }
@@ -4933,44 +4924,137 @@ function createErrorElement(error) {
         return;
       }
       
-      // Проверяем, что если не выбрано "другое", то место должно быть из списка
-      const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
-      if (locationSelect?.value !== 'другое' && !VALID_LOCATIONS.includes(location.toLowerCase())) {
-        showError(`Недопустимое место хранения. Разрешены: ${VALID_LOCATIONS.join(', ')}, или "Другое"`);
-        locationSelect?.focus();
-        return;
-      }
-      
       if (!unit) {
         showError('Выберите единицу измерения');
         unitSelect?.focus();
         return;
       }
       
-      const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
-      if (!VALID_UNITS.includes(unit)) {
-        showError(`Недопустимая единица измерения. Разрешены только: ${VALID_UNITS.join(', ')}`);
-        unitSelect?.focus();
+      // Проверяем артикул на совпадение с базой
+      const existingItems = await items.getAllItems();
+      const skuLower = sku.toLowerCase().trim();
+      
+      // Ищем товар с таким же артикулом в базе
+      const itemWithSameSku = existingItems.find(item => {
+        const itemSku = item.sku ? item.sku.toString().toLowerCase().trim() : '';
+        return itemSku !== '' && itemSku === skuLower;
+      });
+      
+      if (itemWithSameSku) {
+        // Проверяем совпадают ли все обязательные поля
+        const itemName = (itemWithSameSku.name || '').toLowerCase().trim();
+        const itemCategory = (itemWithSameSku.category || '').toLowerCase().trim();
+        const itemLocation = (itemWithSameSku.location || '').toLowerCase().trim();
+        const itemUnit = (itemWithSameSku.unit || '').toLowerCase().trim();
+        
+        const nameMatches = itemName === name.toLowerCase().trim();
+        const categoryMatches = itemCategory === category.toLowerCase().trim();
+        const locationMatches = itemLocation === location.toLowerCase().trim();
+        const unitMatches = itemUnit === unit.toLowerCase().trim();
+        
+        // Если ВСЕ обязательные поля совпадают → переводим в дубликаты
+        if (nameMatches && categoryMatches && locationMatches && unitMatches) {
+          // Создаём данные дубликата
+          const duplicateData = {
+            row: error.row,
+            data: {
+              name: name,
+              sku: sku,
+              category: category,
+              location: location,
+              unit: unit,
+              description: description || null,
+              image_url: error.data?.image_url || null,
+              _extractedImage: error.data?._extractedImage || null
+            },
+            existing: itemWithSameSku,
+            duplicateType: 'database'
+          };
+          
+          // Добавляем в дубликаты
+          importedData.duplicates.push(duplicateData);
+          
+          // Удаляем из ошибок
+          importedData.errors = importedData.errors.filter(e => e.row !== error.row);
+          
+          // Обновляем UI
+          updateFilterButtons(importedData);
+          updateImportPreview(importedData);
+          renderImportPreview(importedData);
+          
+          showError(`Товар перенесён в дубликаты (совпадает с "${itemWithSameSku.name}")`);
+          return;
+        }
+        
+        // Если обязательные поля отличаются → показываем конкретные отличия
+        const mismatches = [];
+        if (!nameMatches) mismatches.push(`название: "${name}" ≠ "${itemWithSameSku.name}"`);
+        if (!categoryMatches) mismatches.push(`категория: "${category}" ≠ "${itemWithSameSku.category}"`);
+        if (!locationMatches) mismatches.push(`место: "${location}" ≠ "${itemWithSameSku.location}"`);
+        if (!unitMatches) mismatches.push(`единица: "${unit}" ≠ "${itemWithSameSku.unit}"`);
+        
+        showError(`Артикул "${sku}" уже в базе. Отличия: ${mismatches.join('; ')}`);
+        skuInput?.focus();
         return;
       }
       
-      // Проверяем уникальность описания (если есть)
-      if (description) {
-        const existingDescriptions = new Set(existingItems.map(item => item.description ? item.description.toLowerCase().trim() : '').filter(d => d));
-        const descLower = description.toLowerCase();
+      // Проверяем уникальность артикула среди уже добавленных товаров для импорта
+      const importedSkuItem = importedData.items.find(item => {
+        const itemSku = item.sku ? item.sku.toString().toLowerCase().trim() : '';
+        return itemSku === skuLower;
+      });
+      
+      if (importedSkuItem) {
+        // Проверяем совпадают ли обязательные поля
+        const itemName = (importedSkuItem.name || '').toLowerCase().trim();
+        const itemCategory = (importedSkuItem.category || '').toLowerCase().trim();
+        const itemLocation = (importedSkuItem.location || '').toLowerCase().trim();
+        const itemUnit = (importedSkuItem.unit || '').toLowerCase().trim();
         
-        if (existingDescriptions.has(descLower)) {
-          showError('Описание уже существует в базе. Описание должно быть уникальным');
-          descriptionInput?.focus();
+        const nameMatches = itemName === name.toLowerCase().trim();
+        const categoryMatches = itemCategory === category.toLowerCase().trim();
+        const locationMatches = itemLocation === location.toLowerCase().trim();
+        const unitMatches = itemUnit === unit.toLowerCase().trim();
+        
+        if (nameMatches && categoryMatches && locationMatches && unitMatches) {
+          // Переводим в дубликаты (дубликат внутри файла)
+          const duplicateData = {
+            row: error.row,
+            data: {
+              name: name,
+              sku: sku,
+              category: category,
+              location: location,
+              unit: unit,
+              description: description || null,
+              image_url: error.data?.image_url || null,
+              _extractedImage: error.data?._extractedImage || null
+            },
+            existing: importedSkuItem,
+            duplicateType: 'file'
+          };
+          
+          importedData.duplicates.push(duplicateData);
+          importedData.errors = importedData.errors.filter(e => e.row !== error.row);
+          
+          updateFilterButtons(importedData);
+          updateImportPreview(importedData);
+          renderImportPreview(importedData);
+          
+          showError(`Товар перенесён в дубликаты (совпадает с "${importedSkuItem.name}" в файле)`);
           return;
         }
         
-        const importedDescriptions = new Set(importedData.items.map(item => item.description ? item.description.toLowerCase().trim() : '').filter(d => d));
-        if (importedDescriptions.has(descLower)) {
-          showError('Описание дублируется в импортируемых данных. Описание должно быть уникальным');
-          descriptionInput?.focus();
-          return;
-        }
+        // Отличия есть → ошибка
+        const mismatches = [];
+        if (!nameMatches) mismatches.push(`название`);
+        if (!categoryMatches) mismatches.push(`категория`);
+        if (!locationMatches) mismatches.push(`место`);
+        if (!unitMatches) mismatches.push(`единица`);
+        
+        showError(`Артикул "${sku}" уже есть в файле. Отличия: ${mismatches.join(', ')}`);
+        skuInput?.focus();
+        return;
       }
       
       // Загружаем изображение, если выбрано новое
@@ -5057,15 +5141,12 @@ function createDuplicateElement(duplicate) {
         <span class="text-xs font-bold text-slate-900 dark:text-white">${dbCategory} • ${dbUnit}</span>
       </div>
     </div>
-    <div class="grid grid-cols-3 gap-2 mt-3">
+    <div class="grid grid-cols-2 gap-2 mt-3">
       <button class="py-2 px-2 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 active:scale-95 transition-all keep-old-btn" data-row="${duplicate.row}">
         Оставить старое
       </button>
       <button class="py-2 px-2 rounded-xl bg-amber-500 text-white text-xs font-bold shadow-md shadow-amber-500/20 hover:bg-amber-600 active:scale-95 transition-all update-btn" data-row="${duplicate.row}">
         Обновить
-      </button>
-      <button class="py-2 px-2 rounded-xl bg-green-500 text-white text-xs font-bold shadow-md shadow-green-500/20 hover:bg-green-600 active:scale-95 transition-all import-as-new-btn" data-row="${duplicate.row}">
-        Импортировать как новый
       </button>
     </div>
   `;
@@ -5073,43 +5154,6 @@ function createDuplicateElement(duplicate) {
   // Обработчики кнопок
   const keepOldBtn = div.querySelector('.keep-old-btn');
   const updateBtn = div.querySelector('.update-btn');
-  const importAsNewBtn = div.querySelector('.import-as-new-btn');
-  
-  if (importAsNewBtn) {
-    importAsNewBtn.addEventListener('click', () => {
-      // Создаем новый товар из дубликата для импорта
-      const newItem = {
-        name: duplicate.data.name,
-        unit: duplicate.data.unit,
-        category: duplicate.data.category || null,
-        location: duplicate.data.location || null,
-        sku: duplicate.data.sku || null,
-        description: duplicate.data.description || null,
-        image_url: duplicate.data.image_url || duplicate.data._extractedImage || null
-      };
-      
-      // Добавляем в список валидных товаров
-      importedData.items.push(newItem);
-      
-      // Удаляем из списка дубликатов
-      importedData.duplicates = importedData.duplicates.filter(d => d.row !== duplicate.row);
-      
-      // Удаляем элемент дубликата из DOM
-      div.remove();
-      
-      // Обновляем счетчики
-      updateFilterButtons(importedData);
-      
-      // Обновляем кнопку импорта и предпросмотр
-      updateImportPreview(importedData);
-      
-      // Перерисовываем предпросмотр, чтобы показать товар в списке валидных
-      renderImportPreview(importedData);
-      
-      showSuccess(`Товар "${duplicate.data.name}" добавлен в список для импорта`);
-    });
-  }
-  
   if (keepOldBtn) {
     keepOldBtn.addEventListener('click', async () => {
       // Заменяем блок дубликата на блок с пометкой "Пропущен"
