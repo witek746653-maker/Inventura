@@ -8,7 +8,7 @@
  */
 
 // Версия кэша — меняйте при обновлении приложения, чтобы пользователи получили новые файлы
-const CACHE_VERSION = 'v1.0.1';
+const CACHE_VERSION = 'v1.0.2';
 const CACHE_NAME = `sabor-inventura-${CACHE_VERSION}`;
 
 // Список файлов для кэширования (эти файлы будут доступны офлайн)
@@ -22,6 +22,7 @@ const FILES_TO_CACHE = [
   './items-import.html',
   './items-management.html',
   './items.html',
+  './assets/tailwind.css',
   './js/app.js',
   './js/db.js',
   './js/inventory-session.js',
