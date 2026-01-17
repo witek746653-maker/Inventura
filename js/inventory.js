@@ -155,16 +155,48 @@ export async function getPreviousSessionComparison(sessionId) {
 
     // Получаем все сессии и находим "последнюю завершенную до текущей"
     const allSessions = await getAllInventorySessions();
-    const previousSession = (allSessions || [])
-      .filter(s =>
-        s &&
-        s.id !== sessionId &&
-        s.status === 'completed' &&
-        s.date &&
-        // Даты в формате YYYY-MM-DD сравниваются строками корректно
-        s.date < currentDate
-      )
-      .sort((a, b) => (a.date < b.date ? 1 : -1))[0] || null;
+    const normalizedCompletedStatuses = new Set(['completed', 'complete', 'done']);
+
+    // В реальности пользователь может сделать 2 инвентаризации в один день.
+    // Поэтому НЕ требуем строго s.date < currentDate. Берем самую последнюю completed,
+    // исключая текущую сессию. Если даты равны — выбираем по updated_at/created_at.
+    const candidateSessions =
+      (allSessions || [])
+        .filter(s => {
+          if (!s || s.id === sessionId) return false;
+          const status = String(s.status || '').trim().toLowerCase();
+          if (!normalizedCompletedStatuses.has(status)) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          // Сортируем по date DESC (если есть)
+          const ad = String(a.date || '');
+          const bd = String(b.date || '');
+          if (ad && bd && ad !== bd) return ad < bd ? 1 : -1;
+
+          // Если даты нет или равны — сортируем по updated_at/created_at DESC
+          const aUpdated = String(a.updated_at || a.created_at || '');
+          const bUpdated = String(b.updated_at || b.created_at || '');
+          if (aUpdated && bUpdated && aUpdated !== bUpdated) return aUpdated < bUpdated ? 1 : -1;
+
+          // Фолбэк: стабильный порядок
+          return 0;
+        });
+
+    // Важно: иногда бывают "пустые" завершенные сессии (без сохраненных позиций).
+    // Тогда "прошлый" будет всегда 0. Поэтому ищем последнюю завершенную сессию,
+    // в которой реально есть хотя бы 1 запись inventory_items.
+    let previousSession = null;
+    let prevItems = [];
+
+    for (const candidate of candidateSessions.slice(0, 20)) {
+      const rows = await getInventoryItemsBySession(candidate.id);
+      if (Array.isArray(rows) && rows.length > 0) {
+        previousSession = candidate;
+        prevItems = rows;
+        break;
+      }
+    }
 
     // Если прошлой сессии нет — сравнивать не с чем
     if (!previousSession) {
@@ -172,7 +204,6 @@ export async function getPreviousSessionComparison(sessionId) {
     }
 
     // Берем все записи прошлой сессии и строим map item_id -> quantity
-    const prevItems = await getInventoryItemsBySession(previousSession.id);
     const previousQuantitiesByItemId = {};
 
     (prevItems || []).forEach(row => {
