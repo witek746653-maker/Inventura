@@ -719,6 +719,11 @@ export async function fetchAllInventoryReports() {
     });
     
     if (!response.ok) {
+      // Если таблица не создана в Supabase, API вернет 404.
+      // Для приложения это не критично: просто считаем, что отчетов на сервере пока нет.
+      if (response.status === 404) {
+        return [];
+      }
       throw new Error(`Ошибка получения отчетов: ${response.statusText}`);
     }
     

@@ -80,11 +80,27 @@ CREATE TABLE inventory_items (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Таблица отчетов инвентаризации (используется на странице "История")
+CREATE TABLE inventory_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID REFERENCES inventory_sessions(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  total_items INTEGER DEFAULT 0,
+  items_with_difference INTEGER DEFAULT 0,
+  positive_difference INTEGER DEFAULT 0,
+  negative_difference INTEGER DEFAULT 0,
+  items JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Индексы для быстрого поиска
 CREATE INDEX idx_items_category ON items(category);
 CREATE INDEX idx_items_location ON items(location);
 CREATE INDEX idx_inventory_items_session ON inventory_items(session_id);
 CREATE INDEX idx_inventory_items_item ON inventory_items(item_id);
+CREATE INDEX idx_inventory_reports_session ON inventory_reports(session_id);
+CREATE INDEX idx_inventory_reports_date ON inventory_reports(date);
 ```
 
 ### 4. Настройка конфигурации
@@ -99,7 +115,8 @@ export const supabaseConfig = {
 };
 ```
 
-**Важно**: Файл `config/supabase-config.js` находится в `.gitignore` и не попадет в репозиторий для безопасности.
+**Важно (безопасность)**: `anon key` в Supabase считается “публичным”, но доступ к данным должен защищаться правилами **RLS** (Row Level Security).
+Если вы публикуете приложение на GitHub Pages, ключ неизбежно будет доступен пользователям — включите RLS и настройте политики на чтение/запись так, как вам нужно.
 
 ### 5. Запуск приложения
 
