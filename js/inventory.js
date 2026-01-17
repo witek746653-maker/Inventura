@@ -134,6 +134,61 @@ export async function getInventorySessionById(id) {
 }
 
 /**
+ * Получить данные для сравнения текущей инвентаризации с предыдущей
+ *
+ * Логика (простыми словами):
+ * - Берем текущую сессию
+ * - Находим последнюю ЗАВЕРШЕННУЮ сессию до неё
+ * - Берем количества товаров из той сессии и возвращаем "словарь" { itemId: quantity }
+ *
+ * Это нужно, чтобы при новой инвентаризации автоматически подставлять "Прошлый: X"
+ * и считать расхождения (разницу).
+ *
+ * @param {string} sessionId - ID текущей сессии
+ * @returns {Promise<{previousSession: Object|null, previousQuantitiesByItemId: Object}>}
+ */
+export async function getPreviousSessionComparison(sessionId) {
+  try {
+    const currentSession = await getInventorySessionById(sessionId);
+    const currentDate =
+      (currentSession && currentSession.date) || new Date().toISOString().split('T')[0];
+
+    // Получаем все сессии и находим "последнюю завершенную до текущей"
+    const allSessions = await getAllInventorySessions();
+    const previousSession = (allSessions || [])
+      .filter(s =>
+        s &&
+        s.id !== sessionId &&
+        s.status === 'completed' &&
+        s.date &&
+        // Даты в формате YYYY-MM-DD сравниваются строками корректно
+        s.date < currentDate
+      )
+      .sort((a, b) => (a.date < b.date ? 1 : -1))[0] || null;
+
+    // Если прошлой сессии нет — сравнивать не с чем
+    if (!previousSession) {
+      return { previousSession: null, previousQuantitiesByItemId: {} };
+    }
+
+    // Берем все записи прошлой сессии и строим map item_id -> quantity
+    const prevItems = await getInventoryItemsBySession(previousSession.id);
+    const previousQuantitiesByItemId = {};
+
+    (prevItems || []).forEach(row => {
+      if (!row || !row.item_id) return;
+      const qty = typeof row.quantity === 'number' ? row.quantity : Number(row.quantity);
+      previousQuantitiesByItemId[row.item_id] = Number.isFinite(qty) ? qty : 0;
+    });
+
+    return { previousSession, previousQuantitiesByItemId };
+  } catch (error) {
+    console.error('Ошибка подготовки сравнения с прошлой сессией:', error);
+    return { previousSession: null, previousQuantitiesByItemId: {} };
+  }
+}
+
+/**
  * Обновить сессию инвентаризации
  * 
  * @param {string} id - ID сессии

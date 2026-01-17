@@ -12,6 +12,8 @@ import * as inventory from './inventory.js';
 // Состояние страницы
 const pageState = {
   sessionId: null,
+  // Прошлая завершенная сессия (для сравнения)
+  previousSession: null,
   currentCategory: '',
   searchQuery: '',
   allItems: [],
@@ -91,10 +93,38 @@ function setCurrentDate() {
 }
 
 /**
+ * Обновить строку даты с подсказкой, с чем сравниваем
+ * (например: "18 января 2026 г. · сравнение с 17 декабря 2025 г.")
+ */
+function updateDateWithComparisonInfo() {
+  const dateEl = document.getElementById('current-date');
+  if (!dateEl) return;
+
+  const now = new Date();
+  const options = { day: 'numeric', month: 'long', year: 'numeric' };
+  let text = now.toLocaleDateString('ru-RU', options);
+
+  if (pageState.previousSession && pageState.previousSession.date) {
+    const prev = new Date(pageState.previousSession.date);
+    // Если дата в неверном формате — просто покажем строкой
+    const prevText = isNaN(prev.getTime())
+      ? String(pageState.previousSession.date)
+      : prev.toLocaleDateString('ru-RU', options);
+    text += ` · сравнение с ${prevText}`;
+  }
+
+  dateEl.textContent = text;
+}
+
+/**
  * Загрузить данные сессии и товаров
  */
 async function loadData() {
   try {
+    // Загружаем саму сессию (нужна дата, чтобы понять "предыдущую" инвентаризацию)
+    const currentSession = await inventory.getInventorySessionById(pageState.sessionId);
+    pageState.currentSession = currentSession || null;
+
     // Загружаем все товары
     pageState.allItems = await items.getAllItems();
     
@@ -111,12 +141,47 @@ async function loadData() {
     inventoryItems.forEach(item => {
       pageState.inventoryItems[item.item_id] = {
         baseQuantity: item.quantity || 0, // При загрузке базовое = сохраненное количество
-        previousQuantity: item.previous_quantity || 0,
+        // Важно: используем ??, чтобы не терять "0" (0 — валидное значение)
+        // Если previous_quantity не было — оставляем null и заполним из прошлой инвентаризации ниже
+        previousQuantity: item.previous_quantity ?? null,
         comment: item.comment || '',
         saved: true,
         additions: [] // Промежуточные значения не сохраняются в БД, только в памяти
       };
     });
+
+    // Подтягиваем "прошлые количества" из предыдущей завершенной инвентаризации
+    // (если она есть). Это делает сравнение "месяц к месяцу" автоматически.
+    const comparison = await inventory.getPreviousSessionComparison(pageState.sessionId);
+    pageState.previousSession = comparison.previousSession || null;
+
+    const prevMap = comparison.previousQuantitiesByItemId || {};
+
+    // Для каждого товара гарантируем, что у нас есть запись в pageState.inventoryItems
+    // и заполнено previousQuantity (по умолчанию 0).
+    pageState.allItems.forEach(it => {
+      const existing = pageState.inventoryItems[it.id];
+      const prevQty = (prevMap[it.id] ?? 0);
+
+      if (existing) {
+        if (existing.previousQuantity === null || typeof existing.previousQuantity !== 'number') {
+          existing.previousQuantity = prevQty;
+        }
+        return;
+      }
+
+      // Если товар ещё не считали в этой сессии — создаем "пустую" запись
+      pageState.inventoryItems[it.id] = {
+        baseQuantity: 0,
+        previousQuantity: prevQty,
+        comment: '',
+        saved: false, // ещё не сохранено, покажем кнопку "сохранить"
+        additions: []
+      };
+    });
+
+    // Обновляем дату в шапке с информацией о сравнении
+    updateDateWithComparisonInfo();
     
   } catch (error) {
     console.error('Ошибка загрузки данных:', error);
@@ -906,13 +971,24 @@ function debounce(func, wait) {
  * Отобразить карточку товара
  */
 function renderItemCard(item) {
-  const itemData = pageState.inventoryItems[item.id] || { quantity: 0, comment: '', saved: false, additions: [] };
+  const itemData = pageState.inventoryItems[item.id] || { quantity: 0, previousQuantity: 0, comment: '', saved: false, additions: [] };
   const baseQuantity = Math.floor(itemData.baseQuantity || itemData.quantity || 0);
   const additions = itemData.additions || [];
   const additionsSum = additions.reduce((sum, val) => sum + val, 0);
   const totalQuantity = baseQuantity + additionsSum; // Общее количество
   const isSaved = itemData.saved;
   const hasComment = itemData.comment && itemData.comment.trim() !== '';
+
+  // Предыдущее количество (для сравнения)
+  const previousQuantity = typeof itemData.previousQuantity === 'number' ? itemData.previousQuantity : 0;
+  const diff = totalQuantity - previousQuantity;
+  const diffLabel = diff > 0 ? `+${diff}` : `${diff}`;
+  const diffClass =
+    diff === 0
+      ? 'text-slate-500 dark:text-slate-400'
+      : diff > 0
+        ? 'text-green-600 dark:text-green-400'
+        : 'text-red-600 dark:text-red-400';
   
   // Экранируем HTML в комментарии для безопасности
   const escapedComment = hasComment ? itemData.comment.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
@@ -1002,7 +1078,10 @@ function renderItemCard(item) {
         <div class="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
           <button class="flex-1 py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center gap-2">
             <span class="material-symbols-outlined text-[18px]">history</span>
-            Прошлый: ${itemData.previousQuantity || 0}
+            <span class="truncate">
+              Прошлый: ${previousQuantity}
+              <span class="${diffClass}"> · Δ ${diffLabel}</span>
+            </span>
           </button>
           <button class="item-comment-btn size-9 rounded-xl flex items-center justify-center ${hasComment ? 'text-primary bg-blue-50 dark:bg-blue-900/20' : 'text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-slate-800'} active:scale-95 transition-all" data-item-id="${item.id}" title="Комментарий">
             <span class="material-symbols-outlined text-[20px]">${hasComment ? 'comment' : 'comment'}</span>
