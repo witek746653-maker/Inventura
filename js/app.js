@@ -2123,8 +2123,12 @@ function setupLocationCustomHandler() {
 
   if (locationEdit && locationCustomEdit) {
     // Удаляем старые обработчики
+    const currentValue = locationEdit.value;
     const newLocationEdit = locationEdit.cloneNode(true);
     locationEdit.parentNode.replaceChild(newLocationEdit, locationEdit);
+    if (currentValue !== undefined) {
+      newLocationEdit.value = currentValue;
+    }
 
     newLocationEdit.addEventListener('change', () => {
       if (newLocationEdit.value === 'другое') {
@@ -2152,8 +2156,12 @@ function setupEditItemValidation() {
   const fields = document.querySelectorAll('.edit-item-field');
   fields.forEach(field => {
     // Удаляем старые обработчики
+    const currentValue = field.value;
     const newField = field.cloneNode(true);
     field.parentNode.replaceChild(newField, field);
+    if (newField.type !== 'file' && currentValue !== undefined) {
+      newField.value = currentValue;
+    }
 
     newField.addEventListener('input', () => {
       const fieldName = newField.getAttribute('data-field');
@@ -6547,4 +6555,3 @@ if (document.readyState === 'loading') {
 
 // Экспортируем функции для использования в других модулях
 export { navigateTo, showError, showSuccess };
-
