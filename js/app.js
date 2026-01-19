@@ -218,10 +218,9 @@ async function initInventoryPage() {
 
     // Загружаем статистику товаров, секций склада и категорий
     const allItems = await items.getAllItems();
-    // Подсчитываем уникальные секции склада (location)
-    const warehouseSections = [...new Set(allItems.map(item => item.location).filter(Boolean))];
-    // Подсчитываем уникальные категории товаров (category)
-    const categories = [...new Set(allItems.map(item => item.category).filter(Boolean))];
+    // Фиксированные секции склада и категории
+    const warehouseSections = ['Бар', 'Кухня', 'Склад', 'Другое'];
+    const categories = ['Посуда', 'Бокалы', 'Приборы', 'Инвентарь', 'Расходники', 'Прочее'];
 
     // Обновляем статистику на странице
     const totalItemsEl = document.getElementById('total-items');
@@ -736,7 +735,7 @@ function setupAddItemFormFields() {
 
   if (locationSelect && locationCustomInput) {
     locationSelect.addEventListener('change', () => {
-      if (locationSelect.value === 'другое') {
+      if (locationSelect.value.toLowerCase() === 'другое') {
         locationCustomInput.classList.remove('hidden');
         locationCustomInput.setAttribute('required', 'required');
       } else {
@@ -861,8 +860,8 @@ function validateAddItemField(fieldName) {
   const modal = document.getElementById('add-item-modal');
   if (!modal) return false;
 
-  const VALID_CATEGORIES = ['посуда', 'бокалы', 'приборы', 'инвентарь', 'расходники', 'прочее'];
-  const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
+  const VALID_CATEGORIES = ['Посуда', 'Бокалы', 'Приборы', 'Инвентарь', 'Расходники', 'Прочее'];
+  const VALID_LOCATIONS = ['Бар', 'Кухня', 'Склад'];
   const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
 
   let field, value, isValid = false;
@@ -878,20 +877,20 @@ function validateAddItemField(fieldName) {
   } else if (fieldName === 'category') {
     field = document.getElementById('add-item-category');
     value = field?.value || '';
-    isValid = value !== '' && VALID_CATEGORIES.includes(value.toLowerCase());
+    isValid = value !== '' && VALID_CATEGORIES.some(category => category.toLowerCase() === value.toLowerCase());
   } else if (fieldName === 'location') {
     const locationSelect = document.getElementById('add-item-location');
     const locationCustomInput = document.getElementById('add-item-location-custom');
     field = locationSelect;
     const locationValue = locationSelect?.value || '';
-    if (locationValue === 'другое') {
+    if (locationValue.toLowerCase() === 'другое') {
       const customValue = locationCustomInput?.value.trim() || '';
       isValid = customValue !== '';
       if (locationCustomInput) {
         updateAddItemFieldValidation(locationCustomInput, isValid);
       }
     } else {
-      isValid = locationValue !== '' && VALID_LOCATIONS.includes(locationValue.toLowerCase());
+      isValid = locationValue !== '' && VALID_LOCATIONS.some(location => location.toLowerCase() === locationValue.toLowerCase());
     }
   } else if (fieldName === 'unit') {
     field = document.getElementById('add-item-unit');
@@ -965,7 +964,7 @@ async function handleAddItemSave() {
   const sku = (skuInput?.value || '').trim();
   const category = categorySelect?.value || '';
   let location = locationSelect?.value || '';
-  if (location === 'другое') {
+  if (location.toLowerCase() === 'другое') {
     location = (locationCustomInput?.value || '').trim();
   }
   const unit = unitSelect?.value || '';
@@ -1522,16 +1521,17 @@ function renderItemDetails(item) {
   const locationDisplay = document.getElementById('item-location-display');
   const locationEdit = document.getElementById('item-location-edit');
   const locationCustomEdit = document.getElementById('item-location-custom-edit');
-  const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
+  const VALID_LOCATIONS = ['Бар', 'Кухня', 'Склад'];
   if (locationDisplay) locationDisplay.textContent = item.location || 'Не указано';
   if (locationEdit) {
     const locationLower = (item.location || '').trim().toLowerCase();
 
-    if (VALID_LOCATIONS.includes(locationLower)) {
-      locationEdit.value = locationLower;
+    const matchedLocation = VALID_LOCATIONS.find(location => location.toLowerCase() === locationLower);
+    if (matchedLocation) {
+      locationEdit.value = matchedLocation;
       if (locationCustomEdit) locationCustomEdit.classList.add('hidden');
     } else if (item.location) {
-      locationEdit.value = 'другое';
+      locationEdit.value = 'Другое';
       if (locationCustomEdit) {
         locationCustomEdit.classList.remove('hidden');
         locationCustomEdit.value = item.location;
@@ -1682,18 +1682,29 @@ function toggleEditMode() {
           // Принудительно устанавливаем значение для селектов при входе в режим редактирования
           let val = '';
           if (edit === 'item-category-edit' && currentItem.category) {
-            val = currentItem.category.trim().toLowerCase();
+            const categoryValue = currentItem.category.trim();
+            const categoryLower = categoryValue.toLowerCase();
             // Динамическое добавление опции для категории если нет
             let exists = false;
             for (let i = 0; i < editEl.options.length; i++) {
-              if (editEl.options[i].value === val) { exists = true; break; }
+              if (editEl.options[i].value.toLowerCase() === categoryLower) { exists = true; break; }
             }
-            if (!exists && val) {
+            if (!exists && categoryValue) {
               const opt = document.createElement('option');
-              opt.value = val;
-              opt.textContent = currentItem.category;
+              opt.value = categoryValue;
+              opt.textContent = categoryValue;
               opt.classList.add('text-primary');
               editEl.appendChild(opt);
+            }
+            if (exists) {
+              for (let i = 0; i < editEl.options.length; i++) {
+                if (editEl.options[i].value.toLowerCase() === categoryLower) {
+                  val = editEl.options[i].value;
+                  break;
+                }
+              }
+            } else {
+              val = categoryValue;
             }
             editEl.value = val;
           } else if (edit === 'item-unit-edit' && currentItem.unit) {
@@ -1712,13 +1723,14 @@ function toggleEditMode() {
             editEl.value = val;
           } else if (edit === 'item-location-edit' && currentItem.location) {
             const loc = currentItem.location.trim().toLowerCase();
-            const VALID = ['бар', 'кухня', 'склад'];
-            if (VALID.includes(loc)) {
-              editEl.value = loc;
+            const VALID = ['Бар', 'Кухня', 'Склад'];
+            const matchedLocation = VALID.find(location => location.toLowerCase() === loc);
+            if (matchedLocation) {
+              editEl.value = matchedLocation;
               const custom = document.getElementById('item-location-custom-edit');
               if (custom) custom.classList.add('hidden');
             } else {
-              editEl.value = 'другое';
+              editEl.value = 'Другое';
               const custom = document.getElementById('item-location-custom-edit');
               if (custom) {
                 custom.classList.remove('hidden');
@@ -1883,7 +1895,7 @@ async function saveItemChanges() {
     const locationCustomEdit = document.getElementById('item-location-custom-edit');
     if (locationEdit) {
       let location = locationEdit.value || '';
-      if (location === 'другое' && locationCustomEdit) {
+      if (location.toLowerCase() === 'другое' && locationCustomEdit) {
         location = locationCustomEdit.value.trim() || '';
       }
       updates.location = location || null;
@@ -2131,7 +2143,7 @@ function setupLocationCustomHandler() {
     }
 
     newLocationEdit.addEventListener('change', () => {
-      if (newLocationEdit.value === 'другое') {
+      if (newLocationEdit.value.toLowerCase() === 'другое') {
         locationCustomEdit.classList.remove('hidden');
         locationCustomEdit.setAttribute('required', 'required');
       } else {
@@ -2143,7 +2155,7 @@ function setupLocationCustomHandler() {
     });
 
     // Проверяем начальное состояние
-    if (newLocationEdit.value === 'другое') {
+    if (newLocationEdit.value.toLowerCase() === 'другое') {
       locationCustomEdit.classList.remove('hidden');
     }
   }
@@ -2201,8 +2213,8 @@ function setupEditItemValidation() {
 function validateEditItemField(fieldName) {
   // При редактировании существующей карточки валидация работает только для логики,
   // но не показывает визуальные индикаторы ошибок
-  const VALID_CATEGORIES = ['посуда', 'бокалы', 'приборы', 'инвентарь', 'расходники', 'прочее'];
-  const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
+  const VALID_CATEGORIES = ['Посуда', 'Бокалы', 'Приборы', 'Инвентарь', 'Расходники', 'Прочее'];
+  const VALID_LOCATIONS = ['Бар', 'Кухня', 'Склад'];
   const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
 
   let field, value, isValid = false;
@@ -2218,17 +2230,17 @@ function validateEditItemField(fieldName) {
   } else if (fieldName === 'category') {
     field = document.getElementById('item-category-edit');
     value = field?.value || '';
-    isValid = value !== '' && VALID_CATEGORIES.includes(value.toLowerCase());
+    isValid = value !== '' && VALID_CATEGORIES.some(category => category.toLowerCase() === value.toLowerCase());
   } else if (fieldName === 'location') {
     const locationSelect = document.getElementById('item-location-edit');
     const locationCustomInput = document.getElementById('item-location-custom-edit');
     field = locationSelect;
     const locationValue = locationSelect?.value || '';
-    if (locationValue === 'другое') {
+    if (locationValue.toLowerCase() === 'другое') {
       const customValue = locationCustomInput?.value.trim() || '';
       isValid = customValue !== '';
     } else {
-      isValid = locationValue !== '' && VALID_LOCATIONS.includes(locationValue.toLowerCase());
+      isValid = locationValue !== '' && VALID_LOCATIONS.some(location => location.toLowerCase() === locationValue.toLowerCase());
     }
   } else if (fieldName === 'location-custom') {
     field = document.getElementById('item-location-custom-edit');
@@ -4692,8 +4704,8 @@ function renderImportPreview(data) {
  * Обновить валидность поля
  */
 function updateFieldValidation(container, fieldName) {
-  const VALID_CATEGORIES = ['посуда', 'бокалы', 'приборы', 'инвентарь', 'расходники', 'прочее'];
-  const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
+  const VALID_CATEGORIES = ['Посуда', 'Бокалы', 'Приборы', 'Инвентарь', 'Расходники', 'Прочее'];
+  const VALID_LOCATIONS = ['Бар', 'Кухня', 'Склад'];
   const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
 
   const field = container.querySelector(`[data-field="${fieldName}"]`);
@@ -4707,20 +4719,20 @@ function updateFieldValidation(container, fieldName) {
   } else if (fieldName === 'sku') {
     isValid = field.value.trim() !== '';
   } else if (fieldName === 'category') {
-    isValid = VALID_CATEGORIES.includes(field.value.toLowerCase());
+    isValid = VALID_CATEGORIES.some(category => category.toLowerCase() === field.value.toLowerCase());
   } else if (fieldName === 'location') {
     const locationValue = field.value;
-    if (locationValue === 'другое') {
+    if (locationValue.toLowerCase() === 'другое') {
       const customInput = container.querySelector('input[data-field="location-custom"]');
       isValid = customInput && customInput.value.trim() !== '';
     } else {
-      isValid = VALID_LOCATIONS.includes(locationValue.toLowerCase());
+      isValid = VALID_LOCATIONS.some(location => location.toLowerCase() === locationValue.toLowerCase());
     }
   } else if (fieldName === 'location-custom') {
     isValid = field.value.trim() !== '';
     // Обновляем также родительский select
     const locationSelect = container.querySelector('select[data-field="location"]');
-    if (locationSelect && locationSelect.value === 'другое') {
+    if (locationSelect && locationSelect.value.toLowerCase() === 'другое') {
       updateFieldValidation(container, 'location');
     }
   } else if (fieldName === 'unit') {
@@ -4754,12 +4766,13 @@ function createErrorElement(error) {
   const errorType = error.message || 'Нет данных';
 
   // Константы для выпадающих списков
-  const VALID_CATEGORIES = ['посуда', 'бокалы', 'приборы', 'инвентарь', 'расходники', 'прочее'];
-  const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
+  const VALID_CATEGORIES = ['Посуда', 'Бокалы', 'Приборы', 'Инвентарь', 'Расходники', 'Прочее'];
+  const VALID_LOCATIONS = ['Бар', 'Кухня', 'Склад'];
   const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
 
   // Проверяем, выбрано ли "другое" для места хранения
-  const isCustomLocation = error.data.location && !VALID_LOCATIONS.includes(error.data.location.toLowerCase());
+  const isCustomLocation = error.data.location
+    && !VALID_LOCATIONS.some(location => location.toLowerCase() === error.data.location.toLowerCase());
   const customLocationValue = isCustomLocation ? error.data.location : '';
 
   // Формируем опции для категорий
@@ -4783,8 +4796,10 @@ function createErrorElement(error) {
   // Определяем валидность полей
   const nameValid = error.data.name && error.data.name.trim() !== '';
   const skuValid = error.data.sku && error.data.sku.trim() !== '';
-  const categoryValid = error.data.category && VALID_CATEGORIES.includes(error.data.category.toLowerCase());
-  const locationValid = error.data.location && (VALID_LOCATIONS.includes(error.data.location.toLowerCase()) || isCustomLocation);
+  const categoryValid = error.data.category
+    && VALID_CATEGORIES.some(category => category.toLowerCase() === error.data.category.toLowerCase());
+  const locationValid = error.data.location
+    && (VALID_LOCATIONS.some(location => location.toLowerCase() === error.data.location.toLowerCase()) || isCustomLocation);
   const unitValid = error.data.unit && VALID_UNITS.includes(error.data.unit);
 
   div.innerHTML = `
@@ -4843,7 +4858,7 @@ function createErrorElement(error) {
           ${categoryOptions}
         </select>
         <div class="hint-content hidden mt-1.5 p-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs text-slate-600 dark:text-slate-400" data-field="category">
-          Обязательное поле. Выберите одну из категорий: посуда, бокалы, приборы, инвентарь, расходники, прочее.
+          Обязательное поле. Выберите одну из категорий: Посуда, Бокалы, Приборы, Инвентарь, Расходники, Прочее.
         </div>
       </div>
       <div>
@@ -4856,11 +4871,11 @@ function createErrorElement(error) {
         <select class="error-field w-full bg-white dark:bg-slate-800 border-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${locationValid ? 'border-green-500 dark:border-green-600 focus:ring-green-500 focus:border-green-500' : 'border-red-300 dark:border-red-700 focus:ring-red-500 focus:border-red-500'} focus:ring-2 outline-none" data-field="location">
           <option value="">Выберите место</option>
           ${locationOptions}
-          <option value="другое" ${isCustomLocation ? 'selected' : ''}>Другое</option>
+          <option value="Другое" ${isCustomLocation ? 'selected' : ''}>Другое</option>
         </select>
         ${isCustomLocation ? `<input class="error-field mt-2 w-full bg-white dark:bg-slate-800 border-2 border-green-500 dark:border-green-600 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none" placeholder="Введите свой вариант" type="text" value="${customLocationValue.replace(/"/g, '&quot;')}" data-field="location-custom"/>` : ''}
         <div class="hint-content hidden mt-1.5 p-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs text-slate-600 dark:text-slate-400" data-field="location">
-          Обязательное поле. Выберите место хранения: бар, кухня, склад, или выберите "Другое" и введите свой вариант.
+          Обязательное поле. Выберите место хранения: Бар, Кухня, Склад, или выберите "Другое" и введите свой вариант.
         </div>
       </div>
     </div>
@@ -4965,7 +4980,7 @@ function createErrorElement(error) {
         const locationContainer = locationSelect.closest('div');
         let customInput = locationContainer.querySelector('input[data-field="location-custom"]');
 
-        if (locationValue === 'другое') {
+        if (locationValue.toLowerCase() === 'другое') {
           if (!customInput) {
             customInput = document.createElement('input');
             customInput.className = 'error-field mt-2 w-full bg-white dark:bg-slate-800 border-2 border-green-500 dark:border-green-600 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none';
@@ -5063,7 +5078,7 @@ function createErrorElement(error) {
       const category = categorySelect?.value || '';
       let location = locationSelect?.value || '';
       // Если выбрано "другое", берем значение из поля ввода
-      if (location === 'другое' && locationCustomInput) {
+      if (location.toLowerCase() === 'другое' && locationCustomInput) {
         location = (locationCustomInput.value || '').trim();
       }
       const unit = unitSelect?.value || '';
