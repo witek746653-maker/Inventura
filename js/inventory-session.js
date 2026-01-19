@@ -8,6 +8,7 @@
 import { initApp } from './app.js';
 import * as items from './items.js';
 import * as inventory from './inventory.js';
+import { showAlert } from './modal.js';
 
 // Состояние страницы
 const pageState = {
@@ -51,32 +52,32 @@ async function initPage() {
   try {
     // Инициализируем приложение
     await initApp();
-    
+
     // Получаем ID сессии из URL
     const urlParams = new URLSearchParams(window.location.search);
     pageState.sessionId = urlParams.get('id');
-    
+
     if (!pageState.sessionId) {
-      alert('ID сессии не указан');
+      await showAlert('ID сессии не указан');
       window.location.href = 'index.html';
       return;
     }
-    
+
     // Устанавливаем текущую дату
     setCurrentDate();
-    
+
     // Загружаем данные
     await loadData();
-    
+
     // Настраиваем обработчики событий
     setupEventHandlers();
-    
+
     // Отображаем товары
     renderItems();
-    
+
   } catch (error) {
     console.error('Ошибка инициализации страницы:', error);
-    alert('Не удалось загрузить страницу. Проверьте консоль для деталей.');
+    await showAlert('Не удалось загрузить страницу. Проверьте консоль для деталей.');
   }
 }
 
@@ -127,16 +128,16 @@ async function loadData() {
 
     // Загружаем все товары
     pageState.allItems = await items.getAllItems();
-    
+
     // Загружаем категории из товаров динамически
     await loadCategoriesFromItems();
-    
+
     // Обновляем UI категорий
     renderCategoryButtons();
-    
+
     // Загружаем записи инвентаризации для этой сессии
     const inventoryItems = await inventory.getInventoryItemsBySession(pageState.sessionId);
-    
+
     // Преобразуем в удобный формат
     inventoryItems.forEach(item => {
       pageState.inventoryItems[item.item_id] = {
@@ -182,7 +183,7 @@ async function loadData() {
 
     // Обновляем дату в шапке с информацией о сравнении
     updateDateWithComparisonInfo();
-    
+
   } catch (error) {
     console.error('Ошибка загрузки данных:', error);
     throw error;
@@ -195,7 +196,7 @@ async function loadData() {
 async function loadCategoriesFromItems() {
   // Начинаем с "Все"
   CATEGORIES = { '': 'Все' };
-  
+
   // Собираем уникальные категории из товаров
   const categoriesSet = new Set();
   pageState.allItems.forEach(item => {
@@ -203,7 +204,7 @@ async function loadCategoriesFromItems() {
       categoriesSet.add(item.category.toLowerCase().trim());
     }
   });
-  
+
   // Добавляем категории в объект
   categoriesSet.forEach(cat => {
     // Делаем первую букву заглавной для отображения
@@ -218,28 +219,28 @@ async function loadCategoriesFromItems() {
 function renderCategoryButtons() {
   const navContainer = document.querySelector('#category-navigation .flex');
   const floatingContainer = document.querySelector('#floating-category-nav .flex.flex-col');
-  
+
   if (!navContainer) return;
-  
+
   // Очищаем существующие кнопки (кроме заголовка в floating)
   navContainer.innerHTML = '';
-  
+
   // Создаём массив категорий с гарантированным порядком: "Все" всегда первая
   const categoriesArray = [['', 'Все']]; // Пустая строка = "Все"
-  
+
   // Добавляем остальные категории (отсортированные по алфавиту)
   Object.entries(CATEGORIES)
     .filter(([key]) => key !== '') // Исключаем "Все", она уже добавлена
     .sort((a, b) => a[1].localeCompare(b[1], 'ru'))
     .forEach(entry => categoriesArray.push(entry));
-  
+
   // Создаём кнопки для каждой категории
   categoriesArray.forEach(([key, name]) => {
     // Кнопка для основной навигации
     const btn = document.createElement('button');
     // При инициализации первая кнопка "Все" должна быть активной
     const isActive = key === '' && pageState.currentCategory === '';
-    
+
     if (isActive) {
       btn.className = 'category-btn shrink-0 h-10 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full text-sm font-medium shadow-md border border-slate-200 dark:border-slate-700 transition-colors';
     } else {
@@ -249,17 +250,17 @@ function renderCategoryButtons() {
     btn.textContent = name;
     navContainer.appendChild(btn);
   });
-  
+
   // Обновляем плавающую навигацию
   if (floatingContainer) {
     // Удаляем старые кнопки
     floatingContainer.querySelectorAll('.floating-category-btn').forEach(btn => btn.remove());
-    
+
     // Добавляем новые кнопки после заголовка
     categoriesArray.forEach(([key, name]) => {
       const btn = document.createElement('button');
       const isActive = key === '' && pageState.currentCategory === '';
-      
+
       if (isActive) {
         btn.className = 'floating-category-btn category-btn w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-colors bg-primary text-white dark:bg-blue-600 dark:text-white font-bold';
       } else {
@@ -281,13 +282,13 @@ function setupEventHandlers() {
   if (backBtn) {
     backBtn.addEventListener('click', handleBack);
   }
-  
+
   // Кнопка "Готово"
   const doneBtn = document.getElementById('done-button');
   if (doneBtn) {
     doneBtn.addEventListener('click', handleDone);
   }
-  
+
   // Поиск
   const searchInput = document.getElementById('search-input');
   if (searchInput) {
@@ -296,7 +297,7 @@ function setupEventHandlers() {
       renderItems();
     });
   }
-  
+
   // Кнопки категорий (обычные и плавающие)
   // Используем делегирование событий для лучшей производительности
   const categoryNav = document.getElementById('category-navigation');
@@ -312,7 +313,7 @@ function setupEventHandlers() {
       }
     });
   }
-  
+
   // Обработчик для плавающих кнопок категорий
   const floatingNav = document.getElementById('floating-category-nav');
   if (floatingNav) {
@@ -326,10 +327,10 @@ function setupEventHandlers() {
       }
     });
   }
-  
+
   // Инициализируем плавающую навигацию
   initFloatingNavigation();
-  
+
   // Обработчик прокрутки для обновления активной категории
   const container = document.getElementById('items-container');
   if (container) {
@@ -337,27 +338,27 @@ function setupEventHandlers() {
       // Обновляем активную категорию при прокрутке
       updateFloatingNavigation();
     }, 100);
-    
+
     container.addEventListener('scroll', debouncedScrollHandler, { passive: true });
-    
+
     // Сохраняем контейнер для виртуализации
     pageState.virtualScroll.container = container;
   }
-  
+
   // Кнопка "Сохранить прогресс"
   const saveBtn = document.getElementById('save-progress-btn');
   if (saveBtn) {
     saveBtn.addEventListener('click', handleSaveAll);
   }
-  
+
   // Умное позиционирование кнопки сохранения
   setupSmartSaveButton();
-  
+
   // Модальное окно выхода
   const exitModal = document.getElementById('exit-modal');
   const modalSaveYes = document.getElementById('modal-save-yes');
   const modalSaveNo = document.getElementById('modal-save-no');
-  
+
   if (modalSaveYes) {
     modalSaveYes.addEventListener('click', async () => {
       await handleSaveAll();
@@ -370,7 +371,7 @@ function setupEventHandlers() {
       window.location.href = 'index.html';
     });
   }
-  
+
   if (modalSaveNo) {
     modalSaveNo.addEventListener('click', () => {
       exitModal.classList.add('hidden');
@@ -382,7 +383,7 @@ function setupEventHandlers() {
       window.location.href = 'index.html';
     });
   }
-  
+
   // Закрытие по клику на фон (только закрывает окно, не уходит)
   if (exitModal) {
     exitModal.addEventListener('click', (e) => {
@@ -392,25 +393,25 @@ function setupEventHandlers() {
       }
     });
   }
-  
+
   // Модальное окно комментария
   setupCommentModal();
-  
+
   // Модальное окно калькулятора
   setupCalculatorModal();
-  
+
   // Модальное окно добавления количества
   setupAdditionModal();
-  
+
   // Модальное окно просмотра товара (фото + название)
   setupPreviewModal();
-  
+
   // Обработчики кликов на карточках товаров (один раз, делегирование)
   setupItemHandlers();
-  
+
   // Автосохранение каждые 30 секунд
   setupAutoSave();
-  
+
   // Предупреждение при закрытии страницы с несохранёнными данными
   setupBeforeUnload();
 }
@@ -423,7 +424,7 @@ function setupAutoSave() {
   if (pageState.autoSaveInterval) {
     clearInterval(pageState.autoSaveInterval);
   }
-  
+
   // Автосохранение каждые 30 секунд
   pageState.autoSaveInterval = setInterval(async () => {
     const hasUnsaved = Object.values(pageState.inventoryItems).some(item => !item.saved);
@@ -456,7 +457,7 @@ function setupBeforeUnload() {
 function handleBack() {
   // Проверяем, есть ли несохраненные изменения
   const hasUnsaved = Object.values(pageState.inventoryItems).some(item => !item.saved);
-  
+
   if (hasUnsaved) {
     showExitModal();
   } else {
@@ -479,7 +480,7 @@ function showExitModal() {
   if (modal) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-    
+
     // Проверяем, есть ли несохранённые изменения для показа правильного текста
     const hasUnsaved = Object.values(pageState.inventoryItems).some(item => !item.saved);
     const messageEl = modal.querySelector('p');
@@ -501,7 +502,7 @@ function showExitModal() {
  */
 function getCategoryId(categoryCode) {
   if (!categoryCode || categoryCode === '') return 'category-all';
-  
+
   // Используем сам код категории напрямую для создания ID
   // Это гарантирует соответствие между тем, что мы ищем и тем, что создаем
   const normalized = categoryCode.toLowerCase().trim().replace(/\s+/g, '-');
@@ -516,9 +517,9 @@ function getCategoryId(categoryCode) {
  */
 function getCategoryIdByName(categoryName) {
   if (!categoryName || categoryName === '') return 'category-all';
-  
+
   if (categoryName === 'Без категории') return 'category-no-category';
-  
+
   // Преобразуем название категории в ID (кириллица остается, все строчные, пробелы заменяются на дефисы)
   const normalized = categoryName.toLowerCase().replace(/\s+/g, '-');
   return `category-${normalized}`;
@@ -531,28 +532,28 @@ function getCategoryIdByName(categoryName) {
 function selectCategory(category, scrollToSection = true) {
   // Нормализуем категорию для сравнения
   // ВАЖНО: пустая строка означает "Все"
-  const normalizedCategory = (category === '' || category === null || category === undefined) 
-    ? '' 
+  const normalizedCategory = (category === '' || category === null || category === undefined)
+    ? ''
     : category.toLowerCase().trim();
   const normalizedCurrent = (pageState.currentCategory || '').toLowerCase().trim();
-  
+
   // Если категория уже выбрана и не нужно прокручивать, не делаем ничего
   if (normalizedCurrent === normalizedCategory && !scrollToSection) {
     return;
   }
-  
+
   // Предотвращаем повторные клики во время навигации (но только если это действительно другой выбор)
   if (pageState.isNavigating && normalizedCurrent === normalizedCategory) {
     return;
   }
-  
+
   // Устанавливаем флаг навигации
   pageState.isNavigating = true;
-  
+
   // ВАЖНО: Сразу обновляем состояние категории
   // Для "Все" устанавливаем пустую строку, которая отключит фильтрацию
   pageState.currentCategory = normalizedCategory;
-  
+
   // Обновляем заголовок
   const titleEl = document.getElementById('category-title');
   if (titleEl) {
@@ -563,13 +564,13 @@ function selectCategory(category, scrollToSection = true) {
       titleEl.textContent = CATEGORIES[normalizedCategory] || normalizedCategory.charAt(0).toUpperCase() + normalizedCategory.slice(1);
     }
   }
-  
+
   // Обновляем стили всех кнопок категорий (обычных и плавающих)
   updateCategoryButtons(normalizedCategory);
-  
+
   // Рендерим товары с новым фильтром
   renderItems();
-  
+
   // Если категория "Все", просто прокручиваем к началу
   if (normalizedCategory === '') {
     const container = document.getElementById('items-container');
@@ -580,7 +581,7 @@ function selectCategory(category, scrollToSection = true) {
     pageState.isNavigating = false;
     return;
   }
-  
+
   // Для конкретной категории: прокручиваем к категории после рендеринга
   if (scrollToSection) {
     // Используем небольшую задержку, чтобы дать браузеру время отрендерить элементы
@@ -590,40 +591,40 @@ function selectCategory(category, scrollToSection = true) {
         pageState.isNavigating = false;
         return;
       }
-      
+
       const categoryId = getCategoryId(normalizedCategory);
-      
+
       // Ищем элемент категории - делаем только одну попытку
       let categoryElement = document.getElementById(categoryId);
-      
+
       // Если не найдено, ищем через querySelector
       if (!categoryElement) {
         categoryElement = container.querySelector(`#${categoryId}`);
       }
-      
+
       // Если все еще не найдено, ищем по всем секциям (но только один раз)
       if (!categoryElement) {
         const allSections = container.querySelectorAll('.category-section');
         categoryElement = Array.from(allSections).find(section => {
           const sectionId = section.id.toLowerCase();
-          return sectionId === categoryId.toLowerCase() || 
-                 sectionId.includes(normalizedCategory) ||
-                 normalizedCategory.includes(sectionId.replace('category-', ''));
+          return sectionId === categoryId.toLowerCase() ||
+            sectionId.includes(normalizedCategory) ||
+            normalizedCategory.includes(sectionId.replace('category-', ''));
         });
       }
-      
+
       if (categoryElement) {
         // Вычисляем позицию прокрутки
         // Используем offsetTop вместо getBoundingClientRect для избежания forced reflow
         const elementOffsetTop = categoryElement.offsetTop;
         const scrollPosition = elementOffsetTop - 120;
-        
-        container.scrollTo({ 
-          top: Math.max(0, scrollPosition), 
-          behavior: 'smooth' 
+
+        container.scrollTo({
+          top: Math.max(0, scrollPosition),
+          behavior: 'smooth'
         });
       }
-      
+
       // Снимаем флаг навигации
       pageState.isNavigating = false;
     }, 100); // Увеличиваем задержку для гарантии завершения рендеринга
@@ -641,7 +642,7 @@ function updateCategoryButtons(activeCategory) {
     const btnCategory = btn.getAttribute('data-category') || '';
     const isFloating = btn.classList.contains('floating-category-btn');
     const isActive = btnCategory === activeCategory;
-    
+
     if (isActive) {
       // Активная кнопка - сначала удаляем все неактивные классы
       if (isFloating) {
@@ -654,7 +655,7 @@ function updateCategoryButtons(activeCategory) {
       } else {
         // Обычная кнопка - темный фон
         btn.classList.remove(
-          'bg-white', 'dark:bg-surface-dark', 
+          'bg-white', 'dark:bg-surface-dark',
           'text-slate-600', 'dark:text-slate-300',
           'bg-primary', 'text-white', 'dark:bg-blue-600', 'dark:text-white', 'font-bold'
         );
@@ -685,7 +686,7 @@ function updateCategoryButtons(activeCategory) {
  */
 function getFilteredItems() {
   let filtered = pageState.allItems;
-  
+
   // Фильтр по категории
   if (pageState.currentCategory) {
     // Нормализуем категории для сравнения (приводим к нижнему регистру)
@@ -695,7 +696,7 @@ function getFilteredItems() {
       return itemCategory === normalizedCategory;
     });
   }
-  
+
   // Фильтр по поисковому запросу
   if (pageState.searchQuery) {
     filtered = filtered.filter(item => {
@@ -703,7 +704,7 @@ function getFilteredItems() {
       return name.includes(pageState.searchQuery);
     });
   }
-  
+
   return filtered;
 }
 
@@ -713,15 +714,15 @@ function getFilteredItems() {
 function renderItems() {
   const container = document.getElementById('items-container');
   if (!container) return;
-  
+
   const filteredItems = getFilteredItems();
-  
+
   if (filteredItems.length === 0) {
     // Проверяем, почему список пустой (для отладки)
     const totalItems = pageState.allItems.length;
     const hasCategoryFilter = pageState.currentCategory !== '';
     const hasSearchFilter = pageState.searchQuery !== '';
-    
+
     if (totalItems > 0) {
       console.log('Товары не найдены после фильтрации:', {
         totalItems,
@@ -731,7 +732,7 @@ function renderItems() {
         hasSearchFilter
       });
     }
-    
+
     container.innerHTML = `
       <div class="px-4 py-12 text-center">
         <p class="text-slate-400 dark:text-slate-500">Товары не найдены</p>
@@ -749,27 +750,27 @@ function renderItems() {
     }
     return;
   }
-  
+
   // Группируем по категориям (item.category может быть в разном регистре)
   const grouped = {};
   const categoryMap = {}; // Маппинг нормализованных категорий к оригинальным
-  
+
   filteredItems.forEach(item => {
     const originalCategory = item.category || '';
     // Нормализуем категорию для группировки (приводим к нижнему регистру)
     const normalizedCategory = originalCategory.toLowerCase().trim();
-    
+
     // Сохраняем оригинальное значение для первого вхождения
     if (!categoryMap[normalizedCategory]) {
       categoryMap[normalizedCategory] = originalCategory;
     }
-    
+
     if (!grouped[normalizedCategory]) {
       grouped[normalizedCategory] = [];
     }
     grouped[normalizedCategory].push(item);
   });
-  
+
   // Подготавливаем данные для виртуализации
   pageState.virtualScroll.itemsData = [];
   // Сортируем категории по названию для отображения
@@ -779,17 +780,17 @@ function renderItems() {
     const nameB = CATEGORIES[b] || CATEGORIES[categoryMap[b]] || categoryMap[b] || b;
     return nameA.localeCompare(nameB, 'ru');
   });
-  
+
   sortedCategories.forEach(normalizedCategory => {
     // Получаем код категории (оригинальный или нормализованный)
     const categoryCode = categoryMap[normalizedCategory] || normalizedCategory;
     // Получаем название категории из CATEGORIES или используем код
     const categoryName = CATEGORIES[normalizedCategory] || CATEGORIES[categoryCode] || categoryCode || 'Без категории';
-    
+
     // Создаем ID для якорной ссылки на основе нормализованной категории
     // Используем нормализованную категорию для создания ID
     const categoryId = getCategoryId(normalizedCategory);
-    
+
     // Добавляем заголовок категории
     pageState.virtualScroll.itemsData.push({
       type: 'category-header',
@@ -797,7 +798,7 @@ function renderItems() {
       categoryCode: categoryCode, // Код для фильтрации
       id: categoryId // ID для якорной ссылки
     });
-    
+
     // Добавляем товары этой категории
     // Используем normalizedCategory для доступа к grouped, так как там категории нормализованы
     const categoryItems = grouped[normalizedCategory];
@@ -811,16 +812,16 @@ function renderItems() {
       });
     }
   });
-  
+
   // Очищаем старый кеш при полной перерисовке
   pageState.virtualScroll.renderedItems.clear();
-  
+
   // Рендерим все элементы
   renderItemsWithVirtualization(container);
-  
+
   // Настраиваем отслеживание активной категории
   setupCategoryObserver();
-  
+
   // Обновляем позицию кнопки сохранения
   if (window.updateSaveButtonPosition) {
     setTimeout(window.updateSaveButtonPosition, 100);
@@ -834,11 +835,11 @@ function renderItems() {
 function renderItemsWithVirtualization(container) {
   const fragment = document.createDocumentFragment();
   const itemsData = pageState.virtualScroll.itemsData;
-  
+
   if (!container || itemsData.length === 0) {
     return;
   }
-  
+
   // Для небольших списков (< 500 элементов) рендерим все элементы сразу
   // Увеличен лимит, т.к. виртуализация плохо работает с CSS Grid
   if (itemsData.length < 500) {
@@ -853,7 +854,7 @@ function renderItemsWithVirtualization(container) {
         fragment.appendChild(itemEl);
       }
     });
-    
+
     // Очищаем и добавляем все элементы за одну операцию
     // Это минимизирует количество forced reflow
     container.innerHTML = '';
@@ -862,19 +863,19 @@ function renderItemsWithVirtualization(container) {
     container.appendChild(fragment);
     return;
   }
-  
+
   // Для больших списков используем виртуализацию
   // Вычисляем видимые элементы
   const containerHeight = container.clientHeight || window.innerHeight;
   const scrollTop = container.scrollTop || 0;
   const visibleStart = Math.max(0, Math.floor(scrollTop / pageState.virtualScroll.itemHeight) - pageState.virtualScroll.buffer);
   const visibleEnd = Math.min(itemsData.length, Math.ceil((scrollTop + containerHeight) / pageState.virtualScroll.itemHeight) + pageState.virtualScroll.buffer);
-  
+
   // Сохраняем только если изменились границы видимости
   if (visibleStart !== pageState.virtualScroll.visibleStart || visibleEnd !== pageState.virtualScroll.visibleEnd) {
     pageState.virtualScroll.visibleStart = visibleStart;
     pageState.virtualScroll.visibleEnd = visibleEnd;
-    
+
     // Удаляем элементы, которые больше не видимы
     pageState.virtualScroll.renderedItems.forEach((element, index) => {
       if (index < visibleStart || index >= visibleEnd) {
@@ -883,14 +884,14 @@ function renderItemsWithVirtualization(container) {
         }
       }
     });
-    
+
     // Рендерим видимые элементы
     for (let i = visibleStart; i < visibleEnd; i++) {
       const data = itemsData[i];
       if (!data) continue;
-      
+
       let element = pageState.virtualScroll.renderedItems.get(i);
-      
+
       // Если элемента нет или он не в DOM, создаем/пересоздаем
       if (!element || !element.parentNode) {
         if (data.type === 'category-header') {
@@ -898,18 +899,18 @@ function renderItemsWithVirtualization(container) {
         } else if (data.type === 'item') {
           element = renderItemCardElement(data.item);
         }
-        
+
         if (element) {
           pageState.virtualScroll.renderedItems.set(i, element);
           fragment.appendChild(element);
         }
       }
     }
-    
+
     // Устанавливаем общую высоту контейнера для прокрутки
     const totalHeight = itemsData.length * pageState.virtualScroll.itemHeight;
     container.style.minHeight = `${totalHeight}px`;
-    
+
     // Добавляем новые элементы в контейнер
     if (fragment.childNodes.length > 0) {
       container.appendChild(fragment);
@@ -927,14 +928,14 @@ function renderCategoryHeader(category, categoryId) {
   // md:px-0 - убираем лишние отступы на широких экранах (они есть на контейнере)
   wrapper.className = 'px-4 pt-4 category-section md:col-span-full md:px-0';
   wrapper.id = categoryId;
-  
+
   wrapper.innerHTML = `
     <div class="flex items-center gap-3 mb-3">
       <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">${category}</h2>
       <div class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
     </div>
   `;
-  
+
   return wrapper;
 }
 
@@ -989,10 +990,10 @@ function renderItemCard(item) {
       : diff > 0
         ? 'text-green-600 dark:text-green-400'
         : 'text-red-600 dark:text-red-400';
-  
+
   // Экранируем HTML в комментарии для безопасности
   const escapedComment = hasComment ? itemData.comment.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
-  
+
   return `
       <div class="bg-white dark:bg-surface-dark rounded-3xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-slate-100 dark:border-slate-800 relative overflow-hidden">
         
@@ -1008,8 +1009,8 @@ function renderItemCard(item) {
           
           <!-- Информация о товаре -->
           <div class="flex flex-col justify-center flex-1 min-w-0">
-            <!-- Название: 2 строки, кликабельное для увеличения -->
-            <button class="item-preview-btn font-bold text-base text-slate-900 dark:text-white leading-snug line-clamp-2 text-left hover:text-primary dark:hover:text-blue-400 transition-colors cursor-zoom-in"
+            <!-- Название: полная высота, кликабельное для увеличения -->
+            <button class="item-preview-btn font-bold text-base text-slate-900 dark:text-white leading-snug text-left hover:text-primary dark:hover:text-blue-400 transition-colors cursor-zoom-in"
                     data-item-id="${item.id}"
                     data-image="${item.image_url || ''}"
                     data-name="${(item.name || 'Без названия').replace(/"/g, '&quot;')}"
@@ -1079,8 +1080,8 @@ function renderItemCard(item) {
           <button class="flex-1 py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center gap-2">
             <span class="material-symbols-outlined text-[18px]">history</span>
             <span class="truncate">
-              Прошлый: ${previousQuantity}
-              <span class="${diffClass}"> · Δ ${diffLabel}</span>
+              Было: ${previousQuantity}
+              <span class="${diffClass}"> · Разница: ${diffLabel}</span>
             </span>
           </button>
           <button class="item-comment-btn size-9 rounded-xl flex items-center justify-center ${hasComment ? 'text-primary bg-blue-50 dark:bg-blue-900/20' : 'text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-slate-800'} active:scale-95 transition-all" data-item-id="${item.id}" title="Комментарий">
@@ -1110,16 +1111,16 @@ function renderItemCard(item) {
 function setupItemHandlers() {
   const container = document.getElementById('items-container');
   if (!container) return;
-  
+
   // Используем делегирование событий - один обработчик на контейнере
   // Это работает даже для динамически добавленных элементов
   container.addEventListener('click', (e) => {
     const target = e.target.closest('[data-item-id]');
     if (!target) return;
-    
+
     const itemId = target.getAttribute('data-item-id');
     if (!itemId) return;
-    
+
     // Увеличение количества
     if (target.classList.contains('item-increase') || target.closest('.item-increase')) {
       e.preventDefault();
@@ -1127,7 +1128,7 @@ function setupItemHandlers() {
       changeQuantity(itemId, 1);
       return;
     }
-    
+
     // Уменьшение количества
     if (target.classList.contains('item-decrease') || target.closest('.item-decrease')) {
       e.preventDefault();
@@ -1135,7 +1136,7 @@ function setupItemHandlers() {
       changeQuantity(itemId, -1);
       return;
     }
-    
+
     // Добавление промежуточного значения (через модальное окно)
     if (target.classList.contains('item-add-addition') || target.closest('.item-add-addition')) {
       e.preventDefault();
@@ -1143,7 +1144,7 @@ function setupItemHandlers() {
       showAdditionModal(itemId);
       return;
     }
-    
+
     // Удаление промежуточного значения
     if (target.classList.contains('item-remove-addition') || target.closest('.item-remove-addition')) {
       e.preventDefault();
@@ -1152,7 +1153,7 @@ function setupItemHandlers() {
       removeAddition(itemId, index);
       return;
     }
-    
+
     // Кнопка сохранения отдельного товара
     if (target.classList.contains('item-save-btn') || target.closest('.item-save-btn')) {
       e.preventDefault();
@@ -1160,7 +1161,7 @@ function setupItemHandlers() {
       saveItem(itemId);
       return;
     }
-    
+
     // Кнопка комментария
     if (target.classList.contains('item-comment-btn') || target.closest('.item-comment-btn')) {
       e.preventDefault();
@@ -1168,7 +1169,7 @@ function setupItemHandlers() {
       showCommentModal(itemId);
       return;
     }
-    
+
     // Кнопка калькулятора
     if (target.classList.contains('item-calculator-btn') || target.closest('.item-calculator-btn')) {
       e.preventDefault();
@@ -1176,7 +1177,7 @@ function setupItemHandlers() {
       showCalculatorModal(itemId);
       return;
     }
-    
+
     // Клик по фото или названию для просмотра
     if (target.classList.contains('item-preview-btn') || target.closest('.item-preview-btn')) {
       e.preventDefault();
@@ -1189,24 +1190,24 @@ function setupItemHandlers() {
       return;
     }
   });
-  
+
   // Обработка ввода количества (отдельно, так как это input событие)
   container.addEventListener('change', (e) => {
     if (e.target.classList.contains('item-quantity-input')) {
       const itemId = e.target.getAttribute('data-item-id');
       if (!itemId) return;
-      
+
       const value = parseInt(e.target.value) || 0;
-      
+
       // Вычитаем промежуточные значения из введенного значения, чтобы получить базовое
       const itemData = pageState.inventoryItems[itemId] || { additions: [] };
       const additionsSum = (itemData.additions || []).reduce((sum, val) => sum + val, 0);
       const baseQuantity = Math.max(0, value - additionsSum);
-      
+
       setQuantity(itemId, baseQuantity);
     }
   });
-  
+
   container.addEventListener('input', (e) => {
     if (e.target.classList.contains('item-quantity-input')) {
       // Предотвращаем ввод отрицательных чисел
@@ -1224,10 +1225,10 @@ function changeQuantity(itemId, delta) {
   if (!pageState.inventoryItems[itemId]) {
     pageState.inventoryItems[itemId] = { baseQuantity: 0, comment: '', saved: false, additions: [] };
   }
-  
+
   const currentBase = pageState.inventoryItems[itemId].baseQuantity || 0;
   const newBaseQuantity = Math.max(0, currentBase + delta);
-  
+
   setQuantity(itemId, newBaseQuantity);
 }
 
@@ -1238,20 +1239,20 @@ function setQuantity(itemId, baseQuantity) {
   if (!pageState.inventoryItems[itemId]) {
     pageState.inventoryItems[itemId] = { baseQuantity: 0, comment: '', saved: false, additions: [] };
   }
-  
+
   // Устанавливаем базовое количество
   pageState.inventoryItems[itemId].baseQuantity = Math.max(0, baseQuantity);
   pageState.inventoryItems[itemId].saved = false;
-  
+
   // Обновляем отображение (показываем общее количество)
   const additionsSum = (pageState.inventoryItems[itemId].additions || []).reduce((sum, val) => sum + val, 0);
   const totalQuantity = pageState.inventoryItems[itemId].baseQuantity + additionsSum;
-  
+
   // Обновляем значение в инпуте, если он существует
   const input = document.querySelector(`.item-quantity-input[data-item-id="${itemId}"]`);
   if (input) {
     input.value = totalQuantity;
-    
+
     // Обновляем статус сохранения (меняем на кнопку "сохранить")
     const cardWrapper = input.closest('.px-4');
     if (cardWrapper) {
@@ -1285,15 +1286,15 @@ function addAddition(itemId, value) {
   if (!pageState.inventoryItems[itemId]) {
     pageState.inventoryItems[itemId] = { baseQuantity: 0, comment: '', saved: false, additions: [] };
   }
-  
+
   if (!pageState.inventoryItems[itemId].additions) {
     pageState.inventoryItems[itemId].additions = [];
   }
-  
+
   // Добавляем новое промежуточное значение
   pageState.inventoryItems[itemId].additions.push(value);
   pageState.inventoryItems[itemId].saved = false;
-  
+
   // Обновляем только эту карточку (вместо перерисовки всего списка)
   updateSingleItemCard(itemId);
 }
@@ -1305,11 +1306,11 @@ function removeAddition(itemId, index) {
   if (!pageState.inventoryItems[itemId] || !pageState.inventoryItems[itemId].additions) {
     return;
   }
-  
+
   // Удаляем промежуточное значение
   pageState.inventoryItems[itemId].additions.splice(index, 1);
   pageState.inventoryItems[itemId].saved = false;
-  
+
   // Обновляем только эту карточку (вместо перерисовки всего списка)
   updateSingleItemCard(itemId);
 }
@@ -1326,23 +1327,23 @@ function updateSingleItemCard(itemId) {
     renderItems();
     return;
   }
-  
+
   const cardWrapper = itemInput.closest('.px-4.mb-5');
   if (!cardWrapper) {
     renderItems();
     return;
   }
-  
+
   // Находим товар в данных
   const item = pageState.allItems.find(i => i.id === itemId);
   if (!item) {
     renderItems();
     return;
   }
-  
+
   // Создаём новую карточку
   const newCardHtml = renderItemCard(item);
-  
+
   // Заменяем содержимое
   cardWrapper.innerHTML = newCardHtml;
 }
@@ -1355,24 +1356,24 @@ async function saveItem(itemId) {
   try {
     const itemData = pageState.inventoryItems[itemId];
     if (!itemData) return;
-    
+
     const item = pageState.allItems.find(i => i.id === itemId);
     if (!item) return;
-    
+
     // Сохраняем текущее состояние перед сохранением
     const currentScrollTop = document.getElementById('items-container')?.scrollTop || 0;
-    
+
     // Вычисляем общее количество (базовое + промежуточные)
     const additionsSum = (itemData.additions || []).reduce((sum, val) => sum + val, 0);
     const totalQuantity = (itemData.baseQuantity || 0) + additionsSum;
-    
+
     // Получаем предыдущее количество
     const previousQuantity = itemData.previousQuantity || 0;
-    
+
     // Помечаем как сохраняемый, чтобы показать индикатор загрузки
     const wasSaved = itemData.saved;
     itemData.saved = false; // Временно, чтобы показать процесс сохранения
-    
+
     // Сохраняем асинхронно, не блокируя интерфейс
     // Используем Promise.race с таймаутом для предотвращения зависаний
     const savePromise = inventory.addOrUpdateInventoryItem(
@@ -1382,18 +1383,18 @@ async function saveItem(itemId) {
       previousQuantity,
       itemData.comment || null
     );
-    
-    const timeoutPromise = new Promise((_, reject) => 
+
+    const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Таймаут сохранения')), 10000)
     );
-    
+
     try {
       await Promise.race([savePromise, timeoutPromise]);
       itemData.saved = true;
-      
+
       // Обновляем только визуальное отображение сохраненного товара
       updateItemCard(itemId);
-      
+
       // Восстанавливаем позицию прокрутки
       const container = document.getElementById('items-container');
       if (container) {
@@ -1409,7 +1410,7 @@ async function saveItem(itemId) {
       // Товар все равно сохранен локально и будет синхронизирован позже
       updateItemCard(itemId);
     }
-    
+
   } catch (error) {
     console.error('Критическая ошибка сохранения товара:', error);
     // Не показываем alert для критических ошибок, чтобы не блокировать интерфейс
@@ -1427,20 +1428,20 @@ function updateItemCard(itemId) {
     console.log(`Элемент товара ${itemId} не найден в DOM`);
     return;
   }
-  
+
   // Находим обёртку карточки (px-4 mb-5 или px-4)
   const itemCard = itemInput.closest('.px-4');
   if (!itemCard) {
     console.log(`Карточка товара ${itemId} не найдена`);
     return;
   }
-  
+
   const item = pageState.allItems.find(i => i.id === itemId);
   if (!item) {
     console.log(`Товар ${itemId} не найден в данных`);
     return;
   }
-  
+
   // Просто перерисовываем HTML карточки целиком
   // Это проще и надёжнее, чем пытаться обновить отдельные элементы
   const newCardHtml = renderItemCard(item);
@@ -1458,34 +1459,34 @@ async function handleSaveAll(silent = false) {
     const unsavedItems = Object.keys(pageState.inventoryItems).filter(
       itemId => !pageState.inventoryItems[itemId].saved
     );
-    
+
     if (unsavedItems.length === 0) {
       if (!silent) {
         showToast('Все изменения уже сохранены', 'info');
       }
       return;
     }
-    
+
     // Показываем индикатор сохранения
     if (!silent) {
       showToast('Сохранение...', 'info', 1000);
     }
-    
+
     // Сохраняем текущее состояние перед сохранением
     const currentScrollTop = document.getElementById('items-container')?.scrollTop || 0;
-    
+
     // Сохраняем все несохраненные товары параллельно (но с ограничением)
     // Это быстрее, чем последовательное сохранение
-    const savePromises = unsavedItems.map(itemId => 
+    const savePromises = unsavedItems.map(itemId =>
       saveItem(itemId).catch(error => {
         console.warn(`Ошибка сохранения товара ${itemId}:`, error);
         return null; // Продолжаем сохранение других товаров
       })
     );
-    
+
     // Ждем завершения всех сохранений (или таймаута)
     await Promise.allSettled(savePromises);
-    
+
     // Восстанавливаем позицию прокрутки
     const container = document.getElementById('items-container');
     if (container) {
@@ -1493,12 +1494,12 @@ async function handleSaveAll(silent = false) {
         container.scrollTop = currentScrollTop;
       });
     }
-    
+
     // Показываем уведомление о результате
-    const savedCount = unsavedItems.filter(itemId => 
+    const savedCount = unsavedItems.filter(itemId =>
       pageState.inventoryItems[itemId]?.saved
     ).length;
-    
+
     if (savedCount > 0) {
       if (!silent) {
         showToast(`Сохранено ${savedCount} из ${unsavedItems.length} позиций`, 'success');
@@ -1507,7 +1508,7 @@ async function handleSaveAll(silent = false) {
     } else if (!silent) {
       showToast('Не удалось сохранить изменения', 'error');
     }
-    
+
   } catch (error) {
     console.error('Ошибка сохранения прогресса:', error);
     if (!silent) {
@@ -1524,7 +1525,7 @@ function setupCommentModal() {
   const textarea = document.getElementById('comment-textarea');
   const saveBtn = document.getElementById('comment-save');
   const cancelBtn = document.getElementById('comment-cancel');
-  
+
   if (saveBtn) {
     saveBtn.addEventListener('click', () => {
       const comment = textarea.value.trim();
@@ -1534,24 +1535,24 @@ function setupCommentModal() {
         }
         pageState.inventoryItems[pageState.currentItemId].comment = comment;
         pageState.inventoryItems[pageState.currentItemId].saved = false;
-        
+
         // Обновляем только эту карточку
         updateSingleItemCard(pageState.currentItemId);
-        
+
         showToast(comment ? 'Комментарий сохранён' : 'Комментарий удалён', 'success');
       }
       modal.classList.add('hidden');
       modal.classList.remove('flex');
     });
   }
-  
+
   if (cancelBtn) {
     cancelBtn.addEventListener('click', () => {
       modal.classList.add('hidden');
       modal.classList.remove('flex');
     });
   }
-  
+
   // Закрытие по клику на фон
   if (modal) {
     modal.addEventListener('click', (e) => {
@@ -1570,10 +1571,10 @@ function showCommentModal(itemId) {
   pageState.currentItemId = itemId;
   const modal = document.getElementById('comment-modal');
   const textarea = document.getElementById('comment-textarea');
-  
+
   const itemData = pageState.inventoryItems[itemId] || { comment: '' };
   textarea.value = itemData.comment || '';
-  
+
   modal.classList.remove('hidden');
   modal.classList.add('flex');
   textarea.focus();
@@ -1587,7 +1588,7 @@ function setupCalculatorModal() {
   const display = document.getElementById('calc-display');
   const applyBtn = document.getElementById('calc-apply');
   const closeBtn = document.getElementById('calc-close');
-  
+
   // Обработчики кнопок калькулятора
   document.querySelectorAll('.calc-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -1595,7 +1596,7 @@ function setupCalculatorModal() {
       handleCalculatorAction(action);
     });
   });
-  
+
   if (applyBtn) {
     applyBtn.addEventListener('click', () => {
       applyCalculatorResult();
@@ -1603,7 +1604,7 @@ function setupCalculatorModal() {
       modal.classList.remove('flex');
     });
   }
-  
+
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
       modal.classList.add('hidden');
@@ -1611,7 +1612,7 @@ function setupCalculatorModal() {
       resetCalculator();
     });
   }
-  
+
   // Закрытие по клику на фон
   if (modal) {
     modal.addEventListener('click', (e) => {
@@ -1634,11 +1635,11 @@ function setupCalculatorModal() {
 function safeCalculate(expression) {
   // Удаляем все символы кроме цифр и операторов
   const cleanExpr = expression.replace(/[^0-9+\-*/]/g, '');
-  
+
   // Разбиваем на токены (числа и операторы)
   const tokens = cleanExpr.match(/(\d+|[+\-*/])/g);
   if (!tokens || tokens.length === 0) return 0;
-  
+
   // Сначала обрабатываем умножение и деление (приоритет операций)
   let i = 0;
   while (i < tokens.length) {
@@ -1646,13 +1647,13 @@ function safeCalculate(expression) {
       const left = parseInt(tokens[i - 1]) || 0;
       const right = parseInt(tokens[i + 1]) || 0;
       let result;
-      
+
       if (tokens[i] === '*') {
         result = left * right;
       } else {
         result = right !== 0 ? Math.floor(left / right) : 0;
       }
-      
+
       // Заменяем три элемента (число, оператор, число) на результат
       tokens.splice(i - 1, 3, result.toString());
       i = 0; // Начинаем сначала
@@ -1660,20 +1661,20 @@ function safeCalculate(expression) {
       i++;
     }
   }
-  
+
   // Теперь обрабатываем сложение и вычитание
   let result = parseInt(tokens[0]) || 0;
   for (let j = 1; j < tokens.length; j += 2) {
     const operator = tokens[j];
     const operand = parseInt(tokens[j + 1]) || 0;
-    
+
     if (operator === '+') {
       result += operand;
     } else if (operator === '-') {
       result -= operand;
     }
   }
-  
+
   return Math.floor(result);
 }
 
@@ -1683,7 +1684,7 @@ function safeCalculate(expression) {
 function handleCalculatorAction(action) {
   const display = document.getElementById('calc-display');
   if (!display) return;
-  
+
   if (action === 'clear') {
     pageState.calculatorValue = '0';
     pageState.calculatorResult = null;
@@ -1745,7 +1746,7 @@ function showCalculatorModal(itemId) {
   pageState.currentItemId = itemId;
   const modal = document.getElementById('calculator-modal');
   resetCalculator();
-  
+
   modal.classList.remove('hidden');
   modal.classList.add('flex');
 }
@@ -1760,16 +1761,16 @@ function showCalculatorModal(itemId) {
 function showToast(message, type = 'info', duration = 2500) {
   const toast = document.getElementById('toast');
   if (!toast) return;
-  
+
   // Устанавливаем текст и иконку
   const icon = toast.querySelector('.toast-icon');
   const text = toast.querySelector('.toast-text');
-  
+
   if (text) text.textContent = message;
-  
+
   // Устанавливаем иконку в зависимости от типа
   if (icon) {
-    switch(type) {
+    switch (type) {
       case 'success':
         icon.textContent = 'check_circle';
         icon.className = 'toast-icon material-symbols-outlined text-green-400 text-[20px]';
@@ -1783,11 +1784,11 @@ function showToast(message, type = 'info', duration = 2500) {
         icon.className = 'toast-icon material-symbols-outlined text-blue-400 text-[20px]';
     }
   }
-  
+
   // Показываем toast
   toast.classList.remove('opacity-0', 'translate-y-4');
   toast.classList.add('opacity-100', 'translate-y-0');
-  
+
   // Скрываем через указанное время
   setTimeout(() => {
     toast.classList.remove('opacity-100', 'translate-y-0');
@@ -1802,7 +1803,7 @@ function showAdditionModal(itemId) {
   pageState.currentItemId = itemId;
   const modal = document.getElementById('addition-modal');
   const input = document.getElementById('addition-input');
-  
+
   if (!modal || !input) {
     // Fallback если модальное окно не найдено
     const value = prompt('Введите количество для добавления:');
@@ -1814,13 +1815,13 @@ function showAdditionModal(itemId) {
     }
     return;
   }
-  
+
   // Очищаем и фокусируем input
   input.value = '';
-  
+
   modal.classList.remove('hidden');
   modal.classList.add('flex');
-  
+
   // Фокус на input после открытия модального окна
   setTimeout(() => input.focus(), 100);
 }
@@ -1833,9 +1834,9 @@ function setupAdditionModal() {
   const input = document.getElementById('addition-input');
   const confirmBtn = document.getElementById('addition-confirm');
   const cancelBtn = document.getElementById('addition-cancel');
-  
+
   if (!modal) return;
-  
+
   // Подтверждение
   if (confirmBtn) {
     confirmBtn.addEventListener('click', () => {
@@ -1851,7 +1852,7 @@ function setupAdditionModal() {
       modal.classList.remove('flex');
     });
   }
-  
+
   // Отмена
   if (cancelBtn) {
     cancelBtn.addEventListener('click', () => {
@@ -1859,7 +1860,7 @@ function setupAdditionModal() {
       modal.classList.remove('flex');
     });
   }
-  
+
   // Enter для подтверждения
   if (input) {
     input.addEventListener('keydown', (e) => {
@@ -1870,7 +1871,7 @@ function setupAdditionModal() {
       }
     });
   }
-  
+
   // Закрытие по клику на фон
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -1886,9 +1887,9 @@ function setupAdditionModal() {
 function setupPreviewModal() {
   const modal = document.getElementById('item-preview-modal');
   const closeBtn = document.getElementById('preview-close');
-  
+
   if (!modal) return;
-  
+
   // Закрытие по кнопке
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
@@ -1896,7 +1897,7 @@ function setupPreviewModal() {
       modal.classList.remove('flex');
     });
   }
-  
+
   // Закрытие по клику на фон
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -1904,7 +1905,7 @@ function setupPreviewModal() {
       modal.classList.remove('flex');
     }
   });
-  
+
   // Закрытие по Escape
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
@@ -1926,9 +1927,9 @@ function showPreviewModal(imageUrl, name, unit) {
   const previewImage = document.getElementById('preview-image');
   const previewName = document.getElementById('preview-name');
   const previewUnit = document.getElementById('preview-unit');
-  
+
   if (!modal) return;
-  
+
   // Устанавливаем данные
   if (previewImage) {
     if (imageUrl) {
@@ -1941,16 +1942,16 @@ function showPreviewModal(imageUrl, name, unit) {
       previewImage.classList.add('flex', 'items-center', 'justify-center');
     }
   }
-  
+
   if (previewName) {
     // Декодируем HTML-сущности
     previewName.textContent = name.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
   }
-  
+
   if (previewUnit) {
     previewUnit.textContent = unit;
   }
-  
+
   // Показываем модальное окно
   modal.classList.remove('hidden');
   modal.classList.add('flex');
@@ -1964,14 +1965,14 @@ function setupCategoryObserver() {
   if (pageState.virtualScroll.intersectionObserver) {
     pageState.virtualScroll.intersectionObserver.disconnect();
   }
-  
+
   // Создаем новый Intersection Observer для отслеживания видимых категорий
   const options = {
     root: document.getElementById('items-container'),
     rootMargin: '-20% 0px -70% 0px', // Категория считается активной, когда она в верхней трети экрана
     threshold: 0
   };
-  
+
   pageState.virtualScroll.intersectionObserver = new IntersectionObserver((entries) => {
     // Находим последнюю видимую категорию
     let lastVisibleCategory = null;
@@ -1983,19 +1984,19 @@ function setupCategoryObserver() {
         }
       }
     });
-    
+
     // Обновляем активную категорию
     if (lastVisibleCategory) {
       updateActiveCategoryFromId(lastVisibleCategory);
     }
   }, options);
-  
+
   // Наблюдаем за всеми секциями категорий
   const categorySections = document.querySelectorAll('.category-section');
   categorySections.forEach(section => {
     pageState.virtualScroll.intersectionObserver.observe(section);
   });
-  
+
   // Также обновляем плавающую навигацию
   updateFloatingNavigation();
 }
@@ -2011,12 +2012,12 @@ function updateActiveCategoryFromId(categoryId) {
   } else {
     categoryKey = categoryId.replace('category-', '');
   }
-  
+
   // Обновляем стили всех кнопок категорий (обычных и плавающих) без прокрутки
   document.querySelectorAll('.category-btn').forEach(btn => {
     const btnCategory = btn.getAttribute('data-category') || '';
     const isFloating = btn.classList.contains('floating-category-btn');
-    
+
     if (btnCategory === categoryKey) {
       if (isFloating) {
         btn.classList.remove('text-slate-600', 'dark:text-slate-400');
@@ -2035,7 +2036,7 @@ function updateActiveCategoryFromId(categoryId) {
       }
     }
   });
-  
+
   // Обновляем плавающую навигацию
   updateFloatingNavigation();
 }
@@ -2047,7 +2048,7 @@ function updateActiveCategoryFromId(categoryId) {
 function initFloatingNavigation() {
   const floatingNav = document.getElementById('floating-category-nav');
   if (!floatingNav) return;
-  
+
   // Обновляем стили плавающих кнопок при изменении активной категории
   updateFloatingNavigation();
 }
@@ -2058,15 +2059,15 @@ function initFloatingNavigation() {
 function updateFloatingNavigation() {
   const floatingNav = document.getElementById('floating-category-nav');
   if (!floatingNav) return;
-  
+
   // Находим активную категорию
   const activeCategoryBtn = document.querySelector('.category-btn.bg-slate-900, .category-btn.dark\\:bg-white');
   let activeCategoryName = 'Все';
-  
+
   if (activeCategoryBtn) {
     activeCategoryName = activeCategoryBtn.textContent.trim() || 'Все';
     const categoryKey = activeCategoryBtn.getAttribute('data-category') || '';
-    
+
     // Обновляем стили плавающих кнопок
     floatingNav.querySelectorAll('.floating-category-btn').forEach(btn => {
       const btnCategory = btn.getAttribute('data-category') || '';
@@ -2079,7 +2080,7 @@ function updateFloatingNavigation() {
       }
     });
   }
-  
+
   // Обновляем заголовок
   const navTitle = floatingNav.querySelector('.floating-nav-title');
   if (navTitle) {
@@ -2095,20 +2096,20 @@ function updateFloatingNavigation() {
 function setupSmartSaveButton() {
   const btnContainer = document.getElementById('save-btn-container');
   if (!btnContainer) return;
-  
+
   // Базовые стили кнопки (static позиция)
   const staticClasses = 'px-4 py-4 flex justify-center';
   // Стили для fixed позиции
   const fixedClasses = 'fixed bottom-0 left-0 right-0 px-4 py-4 flex justify-center z-50 bg-gradient-to-t from-background-light via-background-light/95 to-transparent dark:from-background-dark dark:via-background-dark/95';
-  
+
   function updateButtonPosition() {
     const container = btnContainer;
     const rect = container.getBoundingClientRect();
     const windowHeight = window.innerHeight;
-    
+
     // Проверяем, видна ли кнопка на экране (с учётом её высоты ~80px)
     const isVisible = rect.top < windowHeight - 20;
-    
+
     if (isVisible) {
       // Кнопка видна - используем static позицию
       container.className = staticClasses;
@@ -2117,16 +2118,16 @@ function setupSmartSaveButton() {
       container.className = fixedClasses;
     }
   }
-  
+
   // Обновляем позицию при загрузке
   updateButtonPosition();
-  
+
   // Обновляем при прокрутке
   window.addEventListener('scroll', debounce(updateButtonPosition, 50), { passive: true });
-  
+
   // Обновляем при изменении размера окна
   window.addEventListener('resize', debounce(updateButtonPosition, 100), { passive: true });
-  
+
   // Также обновляем после рендеринга товаров
   // Сохраняем функцию для вызова из renderItems
   window.updateSaveButtonPosition = updateButtonPosition;

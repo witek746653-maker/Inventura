@@ -11,6 +11,7 @@ import { setupAutoSync } from './sync.js';
 import * as items from './items.js';
 import * as inventory from './inventory.js';
 import * as supabase from './supabase.js';
+import { showConfirm, showDangerConfirm, showAlert } from './modal.js';
 
 // Состояние приложения
 const appState = {
@@ -26,28 +27,28 @@ export async function initApp() {
   if (appState.initialized) {
     return;
   }
-  
+
   console.log('Инициализация приложения...');
-  
+
   try {
     // Инициализируем локальную базу данных
     await initDB();
     console.log('База данных инициализирована');
-    
+
     // Настраиваем автоматическую синхронизацию
     setupAutoSync();
     console.log('Автоматическая синхронизация настроена');
-    
+
     // Определяем текущую страницу
     const currentPage = getCurrentPage();
     appState.currentPage = currentPage;
-    
+
     // Инициализируем страницу
     initPage(currentPage);
-    
+
     // Настраиваем навигацию
     setupNavigation();
-    
+
     appState.initialized = true;
     console.log('Приложение инициализировано');
   } catch (error) {
@@ -64,10 +65,10 @@ export async function initApp() {
 function getCurrentPage() {
   const path = window.location.pathname;
   const filename = path.split('/').pop() || 'index.html';
-  
+
   // Проверяем главную страницу
   if (filename === 'index.html' || filename === '' || filename === '/') return 'inventory';
-  
+
   if (filename.includes('inventory.html')) return 'inventory';
   if (filename.includes('items.html') && !filename.includes('items-management.html')) return 'items';
   if (filename.includes('inventory-session.html')) return 'inventory-session';
@@ -75,7 +76,7 @@ function getCurrentPage() {
   if (filename.includes('items-management.html')) return 'items-management';
   if (filename.includes('items-import.html')) return 'items-import';
   if (filename.includes('inventory-history.html')) return 'inventory-history';
-  
+
   return 'inventory'; // По умолчанию
 }
 
@@ -86,7 +87,7 @@ function getCurrentPage() {
  */
 function initPage(pageName) {
   console.log('Инициализация страницы:', pageName);
-  
+
   switch (pageName) {
     case 'inventory':
       initInventoryPage();
@@ -127,14 +128,14 @@ function setupNavigation() {
       }
     });
   });
-  
+
   // Обработчики для кнопок "Назад"
   document.querySelectorAll('[data-back]').forEach(button => {
     button.addEventListener('click', () => {
       window.history.back();
     });
   });
-  
+
   // Подсветка активной кнопки навигации
   highlightActiveNavButton();
 }
@@ -146,7 +147,7 @@ function highlightActiveNavButton() {
   // Определяем текущую страницу
   const path = window.location.pathname;
   const filename = path.split('/').pop() || 'index.html';
-  
+
   let activePage = 'index';
   if (filename.includes('items.html') && !filename.includes('items-import.html') && !filename.includes('items-management.html')) {
     activePage = 'items';
@@ -159,15 +160,15 @@ function highlightActiveNavButton() {
   } else if (filename === 'index.html' || filename === '' || filename === '/') {
     activePage = 'index';
   }
-  
+
   // Находим все кнопки навигации
   const navButtons = document.querySelectorAll('.nav-button[data-nav-page]');
-  
+
   navButtons.forEach(button => {
     const pageId = button.getAttribute('data-nav-page');
     const icon = button.querySelector('.material-symbols-outlined');
     const label = button.querySelector('span:last-child');
-    
+
     // Сбрасываем стили
     button.classList.remove('text-primary');
     button.classList.add('text-slate-400', 'dark:text-slate-500');
@@ -178,7 +179,7 @@ function highlightActiveNavButton() {
       label.classList.remove('font-bold');
       label.classList.add('font-medium');
     }
-    
+
     // Применяем активные стили для текущей страницы
     if (pageId === activePage) {
       button.classList.remove('text-slate-400', 'dark:text-slate-500');
@@ -211,24 +212,32 @@ async function initInventoryPage() {
     // Загружаем активную сессию
     const sessions = await inventory.getAllInventorySessions();
     const activeSession = sessions.find(s => s.status === 'in_progress');
-    
+
     const continueButton = document.querySelector('[data-continue-session]');
     const newSessionButton = document.querySelector('[data-new-session]');
-    
-    // Загружаем статистику товаров и категорий
+
+    // Загружаем статистику товаров, секций склада и категорий
     const allItems = await items.getAllItems();
+    // Подсчитываем уникальные секции склада (location)
+    const warehouseSections = [...new Set(allItems.map(item => item.location).filter(Boolean))];
+    // Подсчитываем уникальные категории товаров (category)
     const categories = [...new Set(allItems.map(item => item.category).filter(Boolean))];
-    
+
     // Обновляем статистику на странице
     const totalItemsEl = document.getElementById('total-items');
+    const totalWarehouseSectionsEl = document.getElementById('total-warehouse-sections');
     const totalCategoriesEl = document.getElementById('total-categories');
+
     if (totalItemsEl) {
       totalItemsEl.textContent = `${allItems.length} шт.`;
+    }
+    if (totalWarehouseSectionsEl) {
+      totalWarehouseSectionsEl.textContent = warehouseSections.length.toString();
     }
     if (totalCategoriesEl) {
       totalCategoriesEl.textContent = categories.length.toString();
     }
-    
+
     // Обновляем дату
     const currentDateEl = document.getElementById('current-date');
     if (currentDateEl) {
@@ -236,11 +245,11 @@ async function initInventoryPage() {
       const options = { day: 'numeric', month: 'long', year: 'numeric' };
       currentDateEl.textContent = today.toLocaleDateString('ru-RU', options);
     }
-    
+
     if (activeSession) {
       // Обновляем информацию о сессии на странице
       await updateInventoryOverview(activeSession, allItems.length);
-      
+
       // Показываем кнопку "Продолжить" и "Закончить", скрываем "Начать новую"
       if (continueButton) {
         continueButton.style.display = 'block';
@@ -251,7 +260,7 @@ async function initInventoryPage() {
           navigateTo(`inventory-session.html?id=${activeSession.id}`);
         });
       }
-      
+
       // Показываем кнопку "Закончить инвентаризацию"
       const completeButton = document.querySelector('[data-complete-session]');
       if (completeButton) {
@@ -262,7 +271,7 @@ async function initInventoryPage() {
           showCompleteModal(activeSession.id);
         });
       }
-      
+
       if (newSessionButton) {
         newSessionButton.style.display = 'none';
       }
@@ -271,23 +280,23 @@ async function initInventoryPage() {
       const sessionStatusEl = document.getElementById('session-status');
       const sessionProgressEl = document.getElementById('session-progress');
       const sessionTitleEl = document.getElementById('session-title');
-      
+
       if (sessionStatusEl) sessionStatusEl.style.display = 'none';
       if (sessionProgressEl) sessionProgressEl.style.display = 'none';
       if (sessionTitleEl) {
         sessionTitleEl.textContent = 'Нет активной сессии';
       }
-      
+
       // Скрываем кнопку "Продолжить" и "Закончить", показываем "Начать новую"
       if (continueButton) {
         continueButton.style.display = 'none';
       }
-      
+
       const completeButton = document.querySelector('[data-complete-session]');
       if (completeButton) {
         completeButton.style.display = 'none';
       }
-      
+
       if (newSessionButton) {
         newSessionButton.style.display = 'block';
         // Удаляем старые обработчики, если они есть
@@ -308,7 +317,7 @@ async function initInventoryPage() {
         });
       }
     }
-    
+
     // Загружаем отчеты для истории
     try {
       const reports = await inventory.getAllInventoryReports();
@@ -341,16 +350,16 @@ async function updateInventoryOverview(session, totalItems) {
     // Получаем записи инвентаризации для этой сессии
     const inventoryItems = await inventory.getInventoryItemsBySession(session.id);
     const processedCount = inventoryItems.length;
-    
+
     // Рассчитываем прогресс
     const progressPercent = totalItems > 0 ? Math.round((processedCount / totalItems) * 100) : 0;
-    
+
     // Обновляем статус сессии
     const sessionStatusEl = document.getElementById('session-status');
     if (sessionStatusEl) {
       sessionStatusEl.style.display = 'inline-flex';
     }
-    
+
     // Обновляем название сессии
     const sessionTitleEl = document.getElementById('session-title');
     if (sessionTitleEl) {
@@ -358,41 +367,41 @@ async function updateInventoryOverview(session, totalItems) {
       const options = { day: 'numeric', month: 'long', year: 'numeric' };
       sessionTitleEl.textContent = `Инвентаризация от ${sessionDate.toLocaleDateString('ru-RU', options)}`;
     }
-    
+
     // Обновляем прогресс
     const sessionProgressEl = document.getElementById('session-progress');
     const progressBarEl = document.getElementById('progress-bar');
     const progressPercentEl = document.getElementById('progress-percent');
     const progressTextEl = document.getElementById('progress-text');
-    
+
     if (sessionProgressEl) {
       sessionProgressEl.style.display = 'block';
     }
-    
+
     if (progressBarEl) {
       progressBarEl.style.width = `${progressPercent}%`;
     }
-    
+
     if (progressPercentEl) {
       progressPercentEl.textContent = `${progressPercent}%`;
     }
-    
+
     if (progressTextEl) {
       progressTextEl.textContent = `Обработано ${processedCount} из ${totalItems} позиций`;
     }
-    
+
     // Проверяем расхождения
     const warningsSection = document.getElementById('warnings-section');
     const warningsText = document.getElementById('warnings-text');
-    const itemsWithDifference = inventoryItems.filter(item => 
+    const itemsWithDifference = inventoryItems.filter(item =>
       item.difference !== null && item.difference !== 0
     );
-    
+
     if (itemsWithDifference.length > 0 && warningsSection && warningsText) {
       warningsSection.style.display = 'flex';
       const positiveCount = itemsWithDifference.filter(item => item.difference > 0).length;
       const negativeCount = itemsWithDifference.filter(item => item.difference < 0).length;
-      
+
       let warningMessage = `Обнаружено ${itemsWithDifference.length} расхождений: `;
       if (positiveCount > 0) {
         warningMessage += `+${positiveCount} излишек`;
@@ -403,7 +412,7 @@ async function updateInventoryOverview(session, totalItems) {
       if (negativeCount > 0) {
         warningMessage += `-${negativeCount} недостача`;
       }
-      
+
       warningsText.textContent = warningMessage;
     } else if (warningsSection) {
       warningsSection.style.display = 'none';
@@ -421,7 +430,7 @@ async function updateInventoryOverview(session, totalItems) {
 function updateInventoryHistory(reports) {
   const historyListEl = document.getElementById('history-list');
   if (!historyListEl) return;
-  
+
   if (reports.length === 0) {
     historyListEl.innerHTML = `
       <div class="text-center py-8 text-slate-400 dark:text-slate-500">
@@ -431,12 +440,12 @@ function updateInventoryHistory(reports) {
     `;
     return;
   }
-  
+
   historyListEl.innerHTML = reports.map(report => {
     const reportDate = new Date(report.date || report.created_at);
     const options = { day: 'numeric', month: 'long', year: 'numeric' };
     const formattedDate = reportDate.toLocaleDateString('ru-RU', options);
-    
+
     return `
       <div class="bg-surface-light dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-between">
         <div class="flex-1">
@@ -449,7 +458,7 @@ function updateInventoryHistory(reports) {
       </div>
     `;
   }).join('');
-  
+
   // Добавляем обработчики для кнопок навигации
   historyListEl.querySelectorAll('[data-navigate]').forEach(button => {
     button.addEventListener('click', () => {
@@ -466,28 +475,28 @@ function updateInventoryHistory(reports) {
 function showCompleteModal(sessionId) {
   const modal = document.getElementById('complete-modal');
   if (!modal) return;
-  
+
   modal.classList.remove('hidden');
   modal.classList.add('flex');
-  
+
   // Обработчик кнопки "Сформировать отчет"
   const yesButton = document.getElementById('complete-yes');
   const cancelButton = document.getElementById('complete-cancel');
-  
+
   const handleYes = async () => {
     try {
       // Создаем отчет
       const report = await inventory.createInventoryReport(sessionId);
-      
+
       // Завершаем сессию
       await inventory.completeInventorySession(sessionId);
-      
+
       showSuccess('Отчет сформирован и сохранен');
-      
+
       // Закрываем модальное окно
       modal.classList.add('hidden');
       modal.classList.remove('flex');
-      
+
       // Обновляем страницу через небольшую задержку
       setTimeout(() => {
         window.location.reload();
@@ -497,17 +506,17 @@ function showCompleteModal(sessionId) {
       showError('Не удалось завершить инвентаризацию и создать отчет');
     }
   };
-  
+
   const handleCancel = () => {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
   };
-  
+
   // Удаляем старые обработчики и добавляем новые
   const newYesButton = yesButton.cloneNode(true);
   yesButton.parentNode.replaceChild(newYesButton, yesButton);
   newYesButton.addEventListener('click', handleYes);
-  
+
   const newCancelButton = cancelButton.cloneNode(true);
   cancelButton.parentNode.replaceChild(newCancelButton, cancelButton);
   newCancelButton.addEventListener('click', handleCancel);
@@ -520,14 +529,14 @@ async function initItemsPage() {
   try {
     // Загружаем товары
     const allItems = await items.getAllItems();
-    
+
     // Сохраняем все товары для фильтрации
     window.currentItems = allItems;
     window.currentCategory = 'all';
-    
+
     // Отображаем товары
     renderItemsList(allItems);
-    
+
     // Настраиваем поиск в реальном времени
     const searchInput = document.querySelector('input[type="search"], input[placeholder*="Поиск"]');
     if (searchInput) {
@@ -535,16 +544,16 @@ async function initItemsPage() {
       searchInput.addEventListener('input', async (e) => {
         clearTimeout(searchTimeout);
         const query = e.target.value.trim();
-        
+
         // Задержка для оптимизации поиска
         searchTimeout = setTimeout(async () => {
           let filteredItems = allItems;
-          
+
           // Применяем фильтр категории, если выбран
           if (window.currentCategory && window.currentCategory !== 'all') {
             filteredItems = filteredItems.filter(item => item.category === window.currentCategory);
           }
-          
+
           // Применяем поиск
           if (query) {
             const lowerQuery = query.toLowerCase();
@@ -555,22 +564,22 @@ async function initItemsPage() {
               return name.includes(lowerQuery) || category.includes(lowerQuery) || sku.includes(lowerQuery);
             });
           }
-          
+
           renderItemsList(filteredItems);
         }, 300);
       });
     }
-    
+
     // Настраиваем фильтры по категориям
     // Ищем все кнопки в области фильтров
     const filterContainer = document.querySelector('.flex.gap-2.px-4.py-2');
     if (filterContainer) {
       const categoryButtons = filterContainer.querySelectorAll('button');
-      
+
       categoryButtons.forEach(button => {
         button.addEventListener('click', async () => {
           const buttonText = button.querySelector('p')?.textContent.trim() || button.textContent.trim();
-          
+
           // Убираем активный класс со всех кнопок
           categoryButtons.forEach(btn => {
             btn.classList.remove('bg-primary', 'text-white', 'shadow-sm');
@@ -579,7 +588,7 @@ async function initItemsPage() {
             if (p) p.classList.remove('text-white');
             if (p) p.classList.add('text-slate-700', 'dark:text-slate-300');
           });
-          
+
           // Добавляем активный класс к выбранной кнопке
           button.classList.remove('bg-white', 'dark:bg-slate-800', 'border', 'border-slate-200', 'dark:border-slate-700', 'text-slate-700', 'dark:text-slate-300');
           button.classList.add('bg-primary', 'text-white', 'shadow-sm');
@@ -588,10 +597,10 @@ async function initItemsPage() {
             p.classList.remove('text-slate-700', 'dark:text-slate-300');
             p.classList.add('text-white');
           }
-          
+
           let filteredItems = allItems;
           const searchQuery = searchInput?.value.trim() || '';
-          
+
           // Определяем категорию
           if (buttonText === 'Все') {
             window.currentCategory = 'all';
@@ -599,7 +608,7 @@ async function initItemsPage() {
             window.currentCategory = buttonText;
             filteredItems = filteredItems.filter(item => item.category === buttonText);
           }
-          
+
           // Применяем поиск, если есть
           if (searchQuery) {
             const lowerQuery = searchQuery.toLowerCase();
@@ -610,15 +619,15 @@ async function initItemsPage() {
               return name.includes(lowerQuery) || category.includes(lowerQuery) || sku.includes(lowerQuery);
             });
           }
-          
+
           renderItemsList(filteredItems);
         });
       });
     }
-    
+
     // Настраиваем клики на элементы списка для перехода на страницу деталей
     setupItemClickHandlers();
-    
+
     // Также обрабатываем существующие статические элементы на странице (если они есть)
     // Это для обратной совместимости, если на странице уже есть разметка товаров
     setTimeout(() => {
@@ -642,7 +651,7 @@ async function initItemsPage() {
         });
       });
     }, 100);
-    
+
     // Инициализируем модальное окно добавления товара
     initAddItemModal();
   } catch (error) {
@@ -659,9 +668,9 @@ function initAddItemModal() {
   const closeButton = document.getElementById('close-add-item-modal');
   const cancelButton = document.getElementById('add-item-cancel');
   const saveButton = document.getElementById('add-item-save');
-  
+
   if (!modal || !fabButton) return;
-  
+
   // Открытие модального окна
   const openModal = () => {
     modal.classList.remove('hidden');
@@ -669,31 +678,31 @@ function initAddItemModal() {
     // Сбрасываем форму
     resetAddItemForm();
   };
-  
+
   // Закрытие модального окна
   const closeModal = () => {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
     resetAddItemForm();
   };
-  
+
   // Обработчики открытия
   fabButton.addEventListener('click', openModal);
-  
+
   // Обработчики закрытия
   if (closeButton) closeButton.addEventListener('click', closeModal);
   if (cancelButton) cancelButton.addEventListener('click', closeModal);
-  
+
   // Закрытие при клике на фон
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       closeModal();
     }
   });
-  
+
   // Инициализация полей формы
   setupAddItemFormFields();
-  
+
   // Обработчик сохранения
   if (saveButton) {
     saveButton.addEventListener('click', async () => {
@@ -708,7 +717,7 @@ function initAddItemModal() {
 function setupAddItemFormFields() {
   const modal = document.getElementById('add-item-modal');
   if (!modal) return;
-  
+
   // Обработчики для подсказок
   const hintToggles = modal.querySelectorAll('.hint-toggle-btn');
   hintToggles.forEach(toggle => {
@@ -720,11 +729,11 @@ function setupAddItemFormFields() {
       }
     });
   });
-  
+
   // Обработчик для места хранения (показ/скрытие поля "другое")
   const locationSelect = document.getElementById('add-item-location');
   const locationCustomInput = document.getElementById('add-item-location-custom');
-  
+
   if (locationSelect && locationCustomInput) {
     locationSelect.addEventListener('change', () => {
       if (locationSelect.value === 'другое') {
@@ -738,7 +747,7 @@ function setupAddItemFormFields() {
       validateAddItemField('location');
     });
   }
-  
+
   // Обработчики валидации для всех полей
   const fields = modal.querySelectorAll('.add-item-field');
   fields.forEach(field => {
@@ -755,20 +764,20 @@ function setupAddItemFormFields() {
       }
     });
   });
-  
+
   // Обработчик загрузки фото
   const imageInput = document.getElementById('add-item-image');
   const imageBtn = document.getElementById('add-item-image-btn');
   const imagePreview = document.getElementById('add-item-image-preview');
   const imagePreviewImg = document.getElementById('add-item-image-preview-img');
   const imageRemoveBtn = document.getElementById('add-item-image-remove');
-  
+
   if (imageBtn && imageInput) {
     imageBtn.addEventListener('click', () => {
       imageInput.click();
     });
   }
-  
+
   if (imageInput) {
     imageInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -789,7 +798,7 @@ function setupAddItemFormFields() {
       }
     });
   }
-  
+
   if (imageRemoveBtn) {
     imageRemoveBtn.addEventListener('click', () => {
       if (imageInput) imageInput.value = '';
@@ -806,7 +815,7 @@ function setupAddItemFormFields() {
 function resetAddItemForm() {
   const modal = document.getElementById('add-item-modal');
   if (!modal) return;
-  
+
   // Очищаем все поля
   const nameInput = document.getElementById('add-item-name');
   const skuInput = document.getElementById('add-item-sku');
@@ -818,7 +827,7 @@ function resetAddItemForm() {
   const imageInput = document.getElementById('add-item-image');
   const imagePreview = document.getElementById('add-item-image-preview');
   const imageBtn = document.getElementById('add-item-image-btn');
-  
+
   if (nameInput) nameInput.value = '';
   if (skuInput) skuInput.value = '';
   if (categorySelect) categorySelect.value = '';
@@ -832,7 +841,7 @@ function resetAddItemForm() {
   if (imageInput) imageInput.value = '';
   if (imagePreview) imagePreview.classList.add('hidden');
   if (imageBtn) imageBtn.classList.remove('hidden');
-  
+
   // Сбрасываем валидацию
   const fields = modal.querySelectorAll('.add-item-field');
   fields.forEach(field => {
@@ -851,13 +860,13 @@ function resetAddItemForm() {
 function validateAddItemField(fieldName) {
   const modal = document.getElementById('add-item-modal');
   if (!modal) return false;
-  
+
   const VALID_CATEGORIES = ['посуда', 'бокалы', 'приборы', 'инвентарь', 'расходники', 'прочее'];
   const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
   const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
-  
+
   let field, value, isValid = false;
-  
+
   if (fieldName === 'name') {
     field = document.getElementById('add-item-name');
     value = field?.value.trim() || '';
@@ -895,11 +904,11 @@ function validateAddItemField(fieldName) {
     // Изображение необязательное, всегда валидно
     isValid = true;
   }
-  
+
   if (field && fieldName !== 'description' && fieldName !== 'image') {
     updateAddItemFieldValidation(field, isValid);
   }
-  
+
   return isValid;
 }
 
@@ -908,17 +917,17 @@ function validateAddItemField(fieldName) {
  */
 function updateAddItemFieldValidation(field, isValid) {
   if (!field) return;
-  
+
   // Удаляем все классы валидации
   field.classList.remove('border-red-300', 'dark:border-red-700', 'border-green-500', 'dark:border-green-600', 'focus:ring-red-500', 'focus:border-red-500', 'focus:ring-green-500', 'focus:border-green-500');
-  
+
   // Добавляем соответствующие классы
   if (isValid) {
     field.classList.add('border-green-500', 'dark:border-green-600', 'focus:ring-green-500', 'focus:border-green-500');
   } else {
     field.classList.add('border-red-300', 'dark:border-red-700', 'focus:ring-red-500', 'focus:border-red-500');
   }
-  
+
   // Обновляем иконку
   const icon = field.parentElement.querySelector('.field-icon');
   if (icon) {
@@ -940,7 +949,7 @@ function updateAddItemFieldValidation(field, isValid) {
 async function handleAddItemSave() {
   const modal = document.getElementById('add-item-modal');
   if (!modal) return;
-  
+
   // Получаем значения полей
   const nameInput = document.getElementById('add-item-name');
   const skuInput = document.getElementById('add-item-sku');
@@ -951,7 +960,7 @@ async function handleAddItemSave() {
   const descriptionInput = document.getElementById('add-item-description');
   const imageInput = document.getElementById('add-item-image');
   const saveButton = document.getElementById('add-item-save');
-  
+
   const name = (nameInput?.value || '').trim();
   const sku = (skuInput?.value || '').trim();
   const category = categorySelect?.value || '';
@@ -961,32 +970,32 @@ async function handleAddItemSave() {
   }
   const unit = unitSelect?.value || '';
   const description = (descriptionInput?.value || '').trim();
-  
+
   // Валидация всех полей
   const nameValid = validateAddItemField('name');
   const skuValid = validateAddItemField('sku');
   const categoryValid = validateAddItemField('category');
   const locationValid = validateAddItemField('location');
   const unitValid = validateAddItemField('unit');
-  
+
   if (!nameValid) {
     showError('Введите название товара');
     nameInput?.focus();
     return;
   }
-  
+
   if (!skuValid) {
     showError('Введите артикул. Артикул обязателен и должен быть уникальным');
     skuInput?.focus();
     return;
   }
-  
+
   // Проверяем уникальность артикула
   try {
     const existingItems = await items.getAllItems();
     const existingSkus = new Set(existingItems.map(item => item.sku ? item.sku.toString().toLowerCase().trim() : '').filter(s => s));
     const skuLower = sku.toLowerCase();
-    
+
     if (existingSkus.has(skuLower)) {
       showError(`Артикул "${sku}" уже существует в базе. Артикул должен быть уникальным`);
       skuInput?.focus();
@@ -996,32 +1005,32 @@ async function handleAddItemSave() {
   } catch (error) {
     console.error('Ошибка проверки уникальности артикула:', error);
   }
-  
+
   if (!categoryValid) {
     showError('Выберите категорию');
     categorySelect?.focus();
     return;
   }
-  
+
   if (!locationValid) {
     showError('Выберите место хранения или введите свой вариант');
     locationSelect?.focus();
     return;
   }
-  
+
   if (!unitValid) {
     showError('Выберите единицу измерения');
     unitSelect?.focus();
     return;
   }
-  
+
   // Проверяем уникальность описания (если указано)
   if (description) {
     try {
       const existingItems = await items.getAllItems();
       const existingDescriptions = new Set(existingItems.map(item => item.description ? item.description.toLowerCase().trim() : '').filter(d => d));
       const descLower = description.toLowerCase();
-      
+
       if (existingDescriptions.has(descLower)) {
         showError('Описание уже существует в базе. Описание должно быть уникальным');
         descriptionInput?.focus();
@@ -1031,16 +1040,16 @@ async function handleAddItemSave() {
       console.error('Ошибка проверки уникальности описания:', error);
     }
   }
-  
+
   // Блокируем кнопку сохранения
   if (saveButton) {
     saveButton.disabled = true;
     saveButton.textContent = 'Сохранение...';
   }
-  
+
   try {
     let imageUrl = null;
-    
+
     // Загружаем изображение, если выбрано
     if (imageInput && imageInput.files && imageInput.files.length > 0) {
       try {
@@ -1059,7 +1068,7 @@ async function handleAddItemSave() {
         return;
       }
     }
-    
+
     // Создаем товар
     const itemData = {
       name: name,
@@ -1070,13 +1079,13 @@ async function handleAddItemSave() {
       description: description || null,
       image_url: imageUrl
     };
-    
+
     const newItem = await items.createItem(itemData);
     console.log('Товар создан:', newItem);
-    
+
     // Показываем успешное сообщение
     showSuccess(`Товар "${name}" успешно добавлен`);
-    
+
     // Закрываем модальное окно
     const modal = document.getElementById('add-item-modal');
     if (modal) {
@@ -1084,18 +1093,18 @@ async function handleAddItemSave() {
       modal.classList.remove('flex');
       resetAddItemForm();
     }
-    
+
     // Обновляем список товаров
     if (window.currentItems) {
       window.currentItems.push(newItem);
     }
-    
+
     // Перезагружаем страницу для обновления списка
     // Или можно обновить список без перезагрузки
     const allItems = await items.getAllItems();
     window.currentItems = allItems;
     renderItemsList(allItems);
-    
+
   } catch (error) {
     console.error('Ошибка создания товара:', error);
     showError('Не удалось создать товар: ' + (error.message || 'Неизвестная ошибка'));
@@ -1115,11 +1124,11 @@ async function handleAddItemSave() {
 function renderItemsList(itemsList) {
   const mainContainer = document.querySelector('main');
   if (!mainContainer) return;
-  
+
   // Очищаем контейнер (кроме первого элемента, если он существует)
   const existingItems = mainContainer.querySelectorAll('[data-item-id]');
   existingItems.forEach(el => el.remove());
-  
+
   // Если нет товаров, показываем сообщение
   if (itemsList.length === 0) {
     const emptyMessage = document.createElement('div');
@@ -1131,13 +1140,13 @@ function renderItemsList(itemsList) {
     mainContainer.appendChild(emptyMessage);
     return;
   }
-  
+
   // Создаем элементы для каждого товара
   itemsList.forEach(item => {
     const itemElement = createItemElement(item);
     mainContainer.appendChild(itemElement);
   });
-  
+
   // Настраиваем обработчики кликов
   setupItemClickHandlers();
 }
@@ -1152,7 +1161,7 @@ function createItemElement(item) {
   const div = document.createElement('div');
   div.className = 'flex items-center gap-4 bg-white dark:bg-[#1e293b] p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 active:scale-[0.99] transition-transform cursor-pointer';
   div.setAttribute('data-item-id', item.id);
-  
+
   const categoryColors = {
     'Посуда': 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 ring-orange-600/10',
     'Приборы': 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 ring-blue-700/10',
@@ -1160,23 +1169,33 @@ function createItemElement(item) {
     'Расходники': 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 ring-gray-500/10',
     'Кухня': 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 ring-orange-600/10',
     'Бар': 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 ring-purple-700/10',
-    'Зал': 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 ring-blue-700/10'
+    'Зал': 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 ring-blue-700/10',
+    'Бокалы': 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 ring-green-700/10',
+    'Инвентарь': 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 ring-yellow-700/10',
+    'Прочее': 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 ring-slate-500/10'
   };
-  
-  const categoryColor = categoryColors[item.category] || 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 ring-slate-500/10';
-  
+
+  // Нормализуем категорию: делаем первую букву заглавной
+  const normalizeCategory = (category) => {
+    if (!category) return '';
+    return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
+  };
+
+  const normalizedCategory = normalizeCategory(item.category);
+  const categoryColor = categoryColors[normalizedCategory] || 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 ring-slate-500/10';
+
   // Обрабатываем URL изображения: если пустой или null, используем placeholder
   // Проверяем, что image_url существует И является строкой, прежде чем вызывать .trim()
-  const imageUrl = (item.image_url && typeof item.image_url === 'string' && item.image_url.trim() !== '') 
-    ? item.image_url.trim() 
+  const imageUrl = (item.image_url && typeof item.image_url === 'string' && item.image_url.trim() !== '')
+    ? item.image_url.trim()
     : 'https://via.placeholder.com/64';
-  
+
   div.innerHTML = `
     <div class="bg-center bg-no-repeat bg-cover rounded-lg size-16 shrink-0 bg-slate-200" style="background-image: url('${imageUrl}');"></div>
     <div class="flex flex-col justify-center flex-1 min-w-0">
       <p class="text-slate-900 dark:text-white text-base font-semibold leading-tight line-clamp-1 mb-1">${item.name || 'Без названия'}</p>
       <div class="flex items-center gap-2">
-        ${item.category ? `<span class="inline-flex items-center rounded-md ${categoryColor} px-2 py-1 text-xs font-medium ring-1 ring-inset">${item.category}</span>` : ''}
+        ${normalizedCategory ? `<span class="inline-flex items-center rounded-md ${categoryColor} px-2 py-1 text-xs font-medium ring-1 ring-inset">${normalizedCategory}</span>` : ''}
         <p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">${item.unit || 'шт'}</p>
       </div>
     </div>
@@ -1184,7 +1203,7 @@ function createItemElement(item) {
       <span class="material-symbols-outlined" style="font-size: 24px;">chevron_right</span>
     </div>
   `;
-  
+
   return div;
 }
 
@@ -1210,33 +1229,33 @@ async function initInventorySessionPage() {
     // Получаем ID сессии из URL
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('id');
-    
+
     if (!sessionId) {
       showError('ID сессии не указан');
       return;
     }
-    
+
     // Загружаем сессию
     const session = await inventory.getInventorySessionById(sessionId);
     if (!session) {
       showError('Сессия не найдена');
       return;
     }
-    
+
     // Загружаем записи инвентаризации
     const inventoryItems = await inventory.getInventoryItemsBySession(sessionId);
-    
+
     // Загружаем все товары для отображения
     const allItems = await items.getAllItems();
-    
+
     // Сохраняем для фильтрации
     window.allInventoryItems = allItems;
     window.inventoryItemsData = inventoryItems;
     window.currentSessionId = sessionId;
-    
+
     // Отображаем товары для инвентаризации
     renderInventoryItems(allItems, inventoryItems, sessionId);
-    
+
     // Настраиваем поиск в реальном времени
     const searchInput = document.querySelector('input[placeholder*="Поиск"]');
     if (searchInput) {
@@ -1244,10 +1263,10 @@ async function initInventorySessionPage() {
       searchInput.addEventListener('input', (e) => {
         clearTimeout(searchTimeout);
         const query = e.target.value.trim();
-        
+
         searchTimeout = setTimeout(() => {
           let filteredItems = allItems;
-          
+
           if (query) {
             const lowerQuery = query.toLowerCase();
             filteredItems = filteredItems.filter(item => {
@@ -1255,12 +1274,12 @@ async function initInventorySessionPage() {
               return name.includes(lowerQuery);
             });
           }
-          
+
           renderInventoryItems(filteredItems, inventoryItems, sessionId);
         }, 300);
       });
     }
-    
+
     // Обработчик сохранения
     const saveButton = document.querySelector('[data-save-session]');
     if (saveButton) {
@@ -1269,7 +1288,7 @@ async function initInventorySessionPage() {
         showSuccess('Прогресс сохранен');
       });
     }
-    
+
     // Обработчик завершения сессии
     const completeButton = document.querySelector('[data-complete-session]');
     if (completeButton) {
@@ -1313,23 +1332,23 @@ async function initItemDetailsPage() {
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const itemId = urlParams.get('id');
-    
+
     if (!itemId) {
       showError('ID товара не указан');
       return;
     }
-    
+
     const item = await items.getItemById(itemId);
     if (!item) {
       showError('Товар не найден');
       return;
     }
-    
+
     currentItem = item;
-    
+
     // Отображаем детали товара
     renderItemDetails(item);
-    
+
     // Обработчик кнопки "Назад"
     const backButton = document.getElementById('back-button');
     if (backButton) {
@@ -1337,19 +1356,19 @@ async function initItemDetailsPage() {
         window.history.back();
       });
     }
-    
+
     // Обработчик кнопки переключения режима редактирования
     const editToggleButton = document.getElementById('edit-toggle-button');
     if (editToggleButton) {
       editToggleButton.addEventListener('click', toggleEditMode);
     }
-    
+
     // Обработчик кнопки сохранения
     const saveButton = document.getElementById('save-item-button');
     if (saveButton) {
       saveButton.addEventListener('click', saveItemChanges);
     }
-    
+
     // Обработчик кнопки удаления и инициализация видимости
     const deleteButton = document.getElementById('delete-item-button');
     if (deleteButton) {
@@ -1361,17 +1380,17 @@ async function initItemDetailsPage() {
         deleteButton.classList.add('hidden');
       }
     }
-    
+
     // Обработчики кнопок изменения количества (активны только в режиме редактирования)
     const quantityDecrease = document.getElementById('quantity-decrease');
     const quantityIncrease = document.getElementById('quantity-increase');
     const quantityInput = document.getElementById('item-quantity');
-    
+
     if (quantityDecrease) {
       quantityDecrease.addEventListener('click', () => {
         // Проверяем, что мы в режиме редактирования
         if (!isEditMode || quantityDecrease.disabled) return;
-        
+
         if (quantityInput) {
           const currentValue = parseFloat(quantityInput.value) || 0;
           const step = parseFloat(quantityInput.step) || 1;
@@ -1381,12 +1400,12 @@ async function initItemDetailsPage() {
         }
       });
     }
-    
+
     if (quantityIncrease) {
       quantityIncrease.addEventListener('click', () => {
         // Проверяем, что мы в режиме редактирования
         if (!isEditMode || quantityIncrease.disabled) return;
-        
+
         if (quantityInput) {
           const currentValue = parseFloat(quantityInput.value) || 0;
           const step = parseFloat(quantityInput.step) || 1;
@@ -1396,7 +1415,7 @@ async function initItemDetailsPage() {
         }
       });
     }
-    
+
     // Обновляем текст кнопки при изменении количества вручную (только в режиме редактирования)
     if (quantityInput) {
       quantityInput.addEventListener('input', () => {
@@ -1405,7 +1424,7 @@ async function initItemDetailsPage() {
         updateSaveButtonText(value);
       });
     }
-    
+
   } catch (error) {
     console.error('Ошибка инициализации страницы деталей товара:', error);
     showError('Ошибка загрузки товара: ' + error.message);
@@ -1419,13 +1438,13 @@ async function initItemDetailsPage() {
  */
 function renderItemDetails(item) {
   console.log('Отображение деталей товара:', item);
-  
+
   // Название товара
   const nameDisplay = document.getElementById('item-name-display');
   const nameEdit = document.getElementById('item-name-edit');
   if (nameDisplay) nameDisplay.textContent = item.name || 'Без названия';
   if (nameEdit) nameEdit.value = item.name || '';
-  
+
   // Категория
   const categoryDisplay = document.getElementById('item-category-display');
   const categoryEdit = document.getElementById('item-category-edit');
@@ -1433,8 +1452,31 @@ function renderItemDetails(item) {
     const categoryText = categoryDisplay.querySelector('p');
     if (categoryText) categoryText.textContent = item.category || 'Не указана';
   }
-  if (categoryEdit) categoryEdit.value = item.category || '';
-  
+  if (categoryEdit) {
+    const categoryValue = (item.category || '').trim().toLowerCase();
+
+    // Проверяем, есть ли такая опция в списке
+    let optionExists = false;
+    for (let i = 0; i < categoryEdit.options.length; i++) {
+      if (categoryEdit.options[i].value === categoryValue) {
+        optionExists = true;
+        break;
+      }
+    }
+
+    // Если опции нет и значение не пустое, добавляем её динамически
+    if (!optionExists && categoryValue) {
+      const newOption = document.createElement('option');
+      newOption.value = categoryValue;
+      // Делаем первую букву заглавной для красоты
+      newOption.textContent = item.category;
+      newOption.classList.add('text-primary');
+      categoryEdit.appendChild(newOption);
+    }
+
+    categoryEdit.value = categoryValue;
+  }
+
   // Единица измерения
   const unitDisplay = document.getElementById('item-unit-display');
   const unitEdit = document.getElementById('item-unit-edit');
@@ -1443,15 +1485,39 @@ function renderItemDetails(item) {
     const unitText = unitDisplay.querySelector('p');
     if (unitText) unitText.textContent = item.unit || 'шт';
   }
-  if (unitEdit) unitEdit.value = item.unit || 'шт';
+
+  if (unitEdit) {
+    const unitValue = item.unit || 'шт.';
+
+    // Проверяем наличие опции
+    let optionExists = false;
+    for (let i = 0; i < unitEdit.options.length; i++) {
+      if (unitEdit.options[i].value === unitValue) {
+        optionExists = true;
+        break;
+      }
+    }
+
+    // Добавляем, если нет
+    if (!optionExists) {
+      const newOption = document.createElement('option');
+      newOption.value = unitValue;
+      newOption.textContent = unitValue;
+      newOption.classList.add('text-slate-700', 'dark:text-slate-200');
+      unitEdit.appendChild(newOption);
+    }
+
+    unitEdit.value = unitValue;
+  }
+
   if (unitBadge) unitBadge.textContent = item.unit || 'шт';
-  
+
   // Описание
   const descriptionDisplay = document.getElementById('item-description-display');
   const descriptionEdit = document.getElementById('item-description-edit');
   if (descriptionDisplay) descriptionDisplay.textContent = item.description || 'Описание не указано';
   if (descriptionEdit) descriptionEdit.value = item.description || '';
-  
+
   // Место хранения
   const locationDisplay = document.getElementById('item-location-display');
   const locationEdit = document.getElementById('item-location-edit');
@@ -1459,26 +1525,29 @@ function renderItemDetails(item) {
   const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
   if (locationDisplay) locationDisplay.textContent = item.location || 'Не указано';
   if (locationEdit) {
-    // Проверяем, является ли место хранения стандартным или кастомным
-    const locationLower = (item.location || '').toLowerCase();
+    const locationLower = (item.location || '').trim().toLowerCase();
+
     if (VALID_LOCATIONS.includes(locationLower)) {
       locationEdit.value = locationLower;
+      if (locationCustomEdit) locationCustomEdit.classList.add('hidden');
     } else if (item.location) {
       locationEdit.value = 'другое';
       if (locationCustomEdit) {
+        locationCustomEdit.classList.remove('hidden');
         locationCustomEdit.value = item.location;
       }
     } else {
       locationEdit.value = '';
+      if (locationCustomEdit) locationCustomEdit.classList.add('hidden');
     }
   }
-  
+
   // Артикул
   const skuDisplay = document.getElementById('item-sku-display');
   const skuEdit = document.getElementById('item-sku-edit');
   if (skuDisplay) skuDisplay.textContent = item.sku || 'Не указан';
   if (skuEdit) skuEdit.value = item.sku || '';
-  
+
   // Изображение
   const imageElement = document.getElementById('item-image');
   if (imageElement) {
@@ -1490,7 +1559,7 @@ function renderItemDetails(item) {
       imageElement.style.backgroundImage = 'none';
     }
   }
-  
+
   // Дата обновления
   const updatedDisplay = document.getElementById('item-updated-display');
   if (updatedDisplay && item.updated_at) {
@@ -1498,7 +1567,7 @@ function renderItemDetails(item) {
     const now = new Date();
     const diffTime = Math.abs(now - updateDate);
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
+
     let dateText = '';
     if (diffDays === 0) {
       dateText = 'Сегодня';
@@ -1513,11 +1582,56 @@ function renderItemDetails(item) {
   } else if (updatedDisplay) {
     updatedDisplay.textContent = 'Не указано';
   }
-  
+
   // Текущий остаток
   const quantityInput = document.getElementById('item-quantity');
   if (quantityInput) {
     quantityInput.value = item.quantity || 0;
+  }
+
+  // Статистика инвентаризации (Предыдущий замер и Разница)
+  const prevMeasureEl = document.getElementById('prev-measurement-display');
+  const diffMeasureEl = document.getElementById('diff-measurement-display');
+
+  if (prevMeasureEl && diffMeasureEl) {
+    // Асинхронно загружаем данные
+    (async () => {
+      try {
+        // 1. Получаем все сессии
+        const sessions = await inventory.getAllInventorySessions();
+        // 2. Ищем последнюю завершенную (completed)
+        const completedSessions = sessions
+          .filter(s => ['completed', 'complete', 'done'].includes((s.status || '').toLowerCase()))
+          .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        const lastSession = completedSessions[0];
+
+        if (lastSession) {
+          // 3. Получаем товары этой сессии
+          const sessionItems = await inventory.getInventoryItemsBySession(lastSession.id);
+          // 4. Ищем наш товар
+          const historyItem = sessionItems.find(i => i.item_id === item.id);
+          const prevQty = historyItem ? (Number(historyItem.quantity) || 0) : 0;
+
+          // 5. Считаем разницу
+          const currentQty = Number(item.quantity) || 0;
+          const diff = currentQty - prevQty;
+          const diffSign = diff > 0 ? '+' : '';
+          const diffClass = diff > 0 ? 'text-green-500' : (diff < 0 ? 'text-red-500' : 'text-slate-400');
+
+          // 6. Обновляем UI
+          prevMeasureEl.textContent = `Предыдущий замер: ${prevQty} ${item.unit || 'шт.'}`;
+          diffMeasureEl.innerHTML = `Разница: <span class="${diffClass} font-medium">${diffSign}${diff}</span>`;
+        } else {
+          // Нет предыдущих сессий
+          prevMeasureEl.textContent = 'Предыдущий замер: -';
+          diffMeasureEl.innerHTML = 'Разница: -';
+        }
+      } catch (err) {
+        console.error('Ошибка загрузки истории для товара:', err);
+        prevMeasureEl.textContent = 'Предыдущий замер: Ошибка';
+      }
+    })();
   }
 }
 
@@ -1533,7 +1647,7 @@ function updateSaveButtonText(quantity) {
  */
 function toggleEditMode() {
   isEditMode = !isEditMode;
-  
+
   // Элементы для отображения и редактирования
   const displayElements = [
     { display: 'item-name-display', edit: 'item-name-edit', wrapper: null },
@@ -1543,12 +1657,12 @@ function toggleEditMode() {
     { display: 'item-location-display', edit: 'item-location-edit', wrapper: 'item-location-edit-wrapper' },
     { display: 'item-sku-display', edit: 'item-sku-edit', wrapper: 'item-sku-edit-wrapper' }
   ];
-  
+
   displayElements.forEach(({ display, edit, wrapper }) => {
     const displayEl = document.getElementById(display);
     const editEl = document.getElementById(edit);
     const wrapperEl = wrapper ? document.getElementById(wrapper) : null;
-    
+
     if (displayEl && editEl) {
       if (isEditMode) {
         // Переключаемся в режим редактирования
@@ -1562,6 +1676,55 @@ function toggleEditMode() {
         if ((editEl.tagName === 'TEXTAREA' || editEl.tagName === 'INPUT') && editEl.type !== 'file') {
           if (editEl.value === '' || editEl.value === '-') {
             editEl.value = displayEl.textContent.trim();
+          }
+        } else if (editEl.tagName === 'SELECT' && currentItem) {
+          console.log('DEBUG: Setting SELECT value', edit, currentItem);
+          // Принудительно устанавливаем значение для селектов при входе в режим редактирования
+          let val = '';
+          if (edit === 'item-category-edit' && currentItem.category) {
+            val = currentItem.category.trim().toLowerCase();
+            // Динамическое добавление опции для категории если нет
+            let exists = false;
+            for (let i = 0; i < editEl.options.length; i++) {
+              if (editEl.options[i].value === val) { exists = true; break; }
+            }
+            if (!exists && val) {
+              const opt = document.createElement('option');
+              opt.value = val;
+              opt.textContent = currentItem.category;
+              opt.classList.add('text-primary');
+              editEl.appendChild(opt);
+            }
+            editEl.value = val;
+          } else if (edit === 'item-unit-edit' && currentItem.unit) {
+            val = currentItem.unit; // init usually exact match or we add it
+            let exists = false;
+            for (let i = 0; i < editEl.options.length; i++) {
+              if (editEl.options[i].value === val) { exists = true; break; }
+            }
+            if (!exists && val) {
+              const opt = document.createElement('option');
+              opt.value = val;
+              opt.textContent = val;
+              opt.classList.add('text-slate-700', 'dark:text-slate-200');
+              editEl.appendChild(opt);
+            }
+            editEl.value = val;
+          } else if (edit === 'item-location-edit' && currentItem.location) {
+            const loc = currentItem.location.trim().toLowerCase();
+            const VALID = ['бар', 'кухня', 'склад'];
+            if (VALID.includes(loc)) {
+              editEl.value = loc;
+              const custom = document.getElementById('item-location-custom-edit');
+              if (custom) custom.classList.add('hidden');
+            } else {
+              editEl.value = 'другое';
+              const custom = document.getElementById('item-location-custom-edit');
+              if (custom) {
+                custom.classList.remove('hidden');
+                custom.value = currentItem.location;
+              }
+            }
           }
         }
         // Фокус только на первом поле
@@ -1579,7 +1742,7 @@ function toggleEditMode() {
       }
     }
   });
-  
+
   // Управление секцией редактирования изображения
   const imageEditSection = document.getElementById('item-image-edit-section');
   if (imageEditSection) {
@@ -1590,12 +1753,12 @@ function toggleEditMode() {
       imageEditSection.classList.add('hidden');
     }
   }
-  
+
   // Управление кнопками и полем количества
   const quantityDecrease = document.getElementById('quantity-decrease');
   const quantityIncrease = document.getElementById('quantity-increase');
   const quantityInput = document.getElementById('item-quantity');
-  
+
   if (isEditMode) {
     // В режиме редактирования кнопки активны
     if (quantityDecrease) {
@@ -1629,7 +1792,7 @@ function toggleEditMode() {
       quantityInput.classList.remove('cursor-text');
     }
   }
-  
+
   // Меняем иконку редактирования
   const editIcon = document.getElementById('edit-icon');
   if (editIcon) {
@@ -1639,7 +1802,7 @@ function toggleEditMode() {
       editIcon.textContent = 'edit';
     }
   }
-  
+
   // Управление кнопкой удаления
   const deleteButton = document.getElementById('delete-item-button');
   if (deleteButton) {
@@ -1651,7 +1814,7 @@ function toggleEditMode() {
       deleteButton.classList.remove('hidden');
     }
   }
-  
+
   // Инициализируем валидацию и обработчики в режиме редактирования
   if (isEditMode) {
     setupEditItemValidation();
@@ -1678,16 +1841,16 @@ async function saveItemChanges() {
     showError('Товар не загружен');
     return;
   }
-  
+
   // В режиме просмотра ничего не сохраняем
   if (!isEditMode) {
     return;
   }
-  
+
   try {
     // Собираем данные из полей редактирования
     const updates = {};
-    
+
     const nameEdit = document.getElementById('item-name-edit');
     const categoryEdit = document.getElementById('item-category-edit');
     const unitEdit = document.getElementById('item-unit-edit');
@@ -1695,27 +1858,27 @@ async function saveItemChanges() {
     const locationEdit = document.getElementById('item-location-edit');
     const skuEdit = document.getElementById('item-sku-edit');
     const quantityInput = document.getElementById('item-quantity');
-    
+
     // Название (обязательное поле)
     if (nameEdit && nameEdit.value.trim()) {
       updates.name = nameEdit.value.trim();
     }
-    
+
     // Категория
     if (categoryEdit) {
       updates.category = categoryEdit.value.trim() || null;
     }
-    
+
     // Единица измерения
     if (unitEdit && unitEdit.value.trim()) {
       updates.unit = unitEdit.value.trim();
     }
-    
+
     // Описание
     if (descriptionEdit) {
       updates.description = descriptionEdit.value.trim() || null;
     }
-    
+
     // Место хранения
     const locationCustomEdit = document.getElementById('item-location-custom-edit');
     if (locationEdit) {
@@ -1725,24 +1888,24 @@ async function saveItemChanges() {
       }
       updates.location = location || null;
     }
-    
+
     // Артикул
     if (skuEdit) {
       updates.sku = skuEdit.value.trim() || null;
     }
-    
+
     // Количество (только в режиме редактирования)
     if (quantityInput && quantityInput.value !== undefined) {
       updates.quantity = parseFloat(quantityInput.value) || 0;
     }
-    
+
     // Базовая валидация (без визуальных индикаторов ошибок)
     if (!updates.name || updates.name.trim() === '') {
       showError('Название товара не может быть пустым');
       nameEdit?.focus();
       return;
     }
-    
+
     // Проверяем уникальность артикула (только если артикул изменился)
     // Исключаем текущий товар из проверки
     if (updates.sku && updates.sku.trim() !== '' && updates.sku !== currentItem.sku) {
@@ -1752,7 +1915,7 @@ async function saveItemChanges() {
         const otherItems = existingItems.filter(item => item.id !== currentItem.id);
         const existingSkus = new Set(otherItems.map(item => item.sku ? item.sku.toString().toLowerCase().trim() : '').filter(s => s));
         const skuLower = updates.sku.toLowerCase().trim();
-        
+
         if (existingSkus.has(skuLower)) {
           showError(`Артикул "${updates.sku}" уже существует в базе. Артикул должен быть уникальным`);
           skuEdit?.focus();
@@ -1762,7 +1925,7 @@ async function saveItemChanges() {
         console.error('Ошибка проверки уникальности артикула:', error);
       }
     }
-    
+
     // Обработка изображения (если выбрано новое)
     const imageInput = document.getElementById('item-image-input');
     if (imageInput && imageInput.files && imageInput.files.length > 0) {
@@ -1784,10 +1947,10 @@ async function saveItemChanges() {
       reader.readAsDataURL(file);
       return; // Выходим, так как сохранение произойдет в onload
     }
-    
+
     // Сохраняем изменения (если нет нового изображения)
     await saveItemUpdates(updates);
-    
+
   } catch (error) {
     console.error('Ошибка сохранения товара:', error);
     showError('Не удалось сохранить изменения: ' + error.message);
@@ -1801,16 +1964,16 @@ async function saveItemUpdates(updates) {
   try {
     console.log('Сохранение изменений:', updates);
     const updatedItem = await items.updateItem(currentItem.id, updates);
-    
+
     // Обновляем текущий товар
     currentItem = updatedItem;
-    
+
     // Обновляем отображение
     renderItemDetails(updatedItem);
-    
+
     // Выходим из режима редактирования
     toggleEditMode();
-    
+
     showSuccess('Изменения сохранены успешно');
   } catch (error) {
     console.error('Ошибка сохранения обновлений:', error);
@@ -1826,21 +1989,21 @@ async function handleDeleteItem() {
     showError('Товар не загружен');
     return;
   }
-  
+
   // Показываем подтверждение удаления
-  const confirmed = confirm(`Вы уверены, что хотите удалить позицию "${currentItem.name}"?\n\nЭто действие удалит позицию из локального хранилища и с сервера. Это действие нельзя отменить.`);
-  
+  const confirmed = await showDangerConfirm(`Вы уверены, что хотите удалить позицию "${currentItem.name}"?\n\nЭто действие удалит позицию из локального хранилища и с сервера. Это действие нельзя отменить.`);
+
   if (!confirmed) {
     return;
   }
-  
+
   try {
     // Удаляем товар
     await items.deleteItem(currentItem.id);
-    
+
     // Показываем успешное сообщение
     showSuccess('Позиция успешно удалена');
-    
+
     // Возвращаемся на страницу товаров
     setTimeout(() => {
       navigateTo('items.html');
@@ -1861,21 +2024,21 @@ function setupImageEditHandlers() {
   const imagePreviewImg = document.getElementById('item-image-preview-img');
   const imageRemoveBtn = document.getElementById('item-image-remove');
   const imageElement = document.getElementById('item-image');
-  
+
   if (!imageInput || !imageBtn) return;
-  
+
   // Удаляем старые обработчики через клонирование
   const newImageBtn = imageBtn.cloneNode(true);
   imageBtn.parentNode.replaceChild(newImageBtn, imageBtn);
-  
+
   const newImageInput = imageInput.cloneNode(true);
   imageInput.parentNode.replaceChild(newImageInput, imageInput);
-  
+
   // Обработчик кнопки выбора фото
   newImageBtn.addEventListener('click', () => {
     newImageInput.click();
   });
-  
+
   // Обработчик выбора файла
   newImageInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -1886,7 +2049,7 @@ function setupImageEditHandlers() {
         newImageInput.value = '';
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onload = (event) => {
         if (imagePreviewImg) {
@@ -1909,12 +2072,12 @@ function setupImageEditHandlers() {
       reader.readAsDataURL(file);
     }
   });
-  
+
   // Обработчик кнопки удаления фото
   if (imageRemoveBtn) {
     const newImageRemoveBtn = imageRemoveBtn.cloneNode(true);
     imageRemoveBtn.parentNode.replaceChild(newImageRemoveBtn, imageRemoveBtn);
-    
+
     newImageRemoveBtn.addEventListener('click', () => {
       newImageInput.value = '';
       if (imagePreview) {
@@ -1932,7 +2095,7 @@ function setupImageEditHandlers() {
       }
     });
   }
-  
+
   // Показываем текущее изображение в превью, если оно есть
   if (imageElement && imageElement.style.backgroundImage && imageElement.style.backgroundImage !== 'none') {
     const bgImage = imageElement.style.backgroundImage;
@@ -1957,12 +2120,12 @@ function setupImageEditHandlers() {
 function setupLocationCustomHandler() {
   const locationEdit = document.getElementById('item-location-edit');
   const locationCustomEdit = document.getElementById('item-location-custom-edit');
-  
+
   if (locationEdit && locationCustomEdit) {
     // Удаляем старые обработчики
     const newLocationEdit = locationEdit.cloneNode(true);
     locationEdit.parentNode.replaceChild(newLocationEdit, locationEdit);
-    
+
     newLocationEdit.addEventListener('change', () => {
       if (newLocationEdit.value === 'другое') {
         locationCustomEdit.classList.remove('hidden');
@@ -1974,7 +2137,7 @@ function setupLocationCustomHandler() {
       }
       validateEditItemField('location');
     });
-    
+
     // Проверяем начальное состояние
     if (newLocationEdit.value === 'другое') {
       locationCustomEdit.classList.remove('hidden');
@@ -1991,7 +2154,7 @@ function setupEditItemValidation() {
     // Удаляем старые обработчики
     const newField = field.cloneNode(true);
     field.parentNode.replaceChild(newField, field);
-    
+
     newField.addEventListener('input', () => {
       const fieldName = newField.getAttribute('data-field');
       if (fieldName) {
@@ -2005,14 +2168,14 @@ function setupEditItemValidation() {
       }
     });
   });
-  
+
   // Обработчики для подсказок
   const hintToggles = document.querySelectorAll('.hint-toggle-btn');
   hintToggles.forEach(toggle => {
     // Удаляем старые обработчики
     const newToggle = toggle.cloneNode(true);
     toggle.parentNode.replaceChild(newToggle, toggle);
-    
+
     newToggle.addEventListener('click', () => {
       const field = newToggle.getAttribute('data-field');
       const hintContent = document.querySelector(`.hint-content[data-field="${field}"]`);
@@ -2033,9 +2196,9 @@ function validateEditItemField(fieldName) {
   const VALID_CATEGORIES = ['посуда', 'бокалы', 'приборы', 'инвентарь', 'расходники', 'прочее'];
   const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
   const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
-  
+
   let field, value, isValid = false;
-  
+
   if (fieldName === 'name') {
     field = document.getElementById('item-name-edit');
     value = field?.value.trim() || '';
@@ -2081,7 +2244,7 @@ function validateEditItemField(fieldName) {
     // Изображение необязательное, всегда валидно
     isValid = true;
   }
-  
+
   // Не вызываем updateEditItemFieldValidation - не показываем визуальные ошибки при редактировании
   return isValid;
 }
@@ -2092,11 +2255,11 @@ function validateEditItemField(fieldName) {
  */
 function updateEditItemFieldValidation(field, isValid) {
   if (!field) return;
-  
+
   // При редактировании существующей карточки не показываем визуальные индикаторы ошибок
   // Только обновляем border при фокусе для лучшего UX
   field.classList.remove('border-red-300', 'dark:border-red-700', 'border-green-500', 'dark:border-green-600', 'focus:ring-red-500', 'focus:border-red-500', 'focus:ring-green-500', 'focus:border-green-500', 'border-slate-300', 'dark:border-slate-600');
-  
+
   // Для полей с border-b-2 просто обновляем цвет при фокусе
   if (field.classList.contains('border-b-2')) {
     // Ничего не делаем - стиль уже настроен через CSS классы
@@ -2119,7 +2282,7 @@ function showUploadProgress(percent, text) {
   const defaultContent = document.getElementById('upload-default-content');
   const progressContent = document.getElementById('upload-progress-content');
   const successContent = document.getElementById('upload-success-content');
-  
+
   if (defaultContent) defaultContent.classList.add('hidden');
   if (successContent) successContent.classList.add('hidden');
   if (progressContent) {
@@ -2137,11 +2300,11 @@ function updateUploadProgress(percent, text) {
   const progressCircle = document.getElementById('upload-progress-circle');
   const progressPercentage = document.getElementById('upload-progress-percentage');
   const progressText = document.getElementById('upload-progress-text');
-  
+
   // Вычисляем смещение для круга (283 - окружность с радиусом 45)
   const circumference = 2 * Math.PI * 45;
   const offset = circumference - (circumference * percent / 100);
-  
+
   if (progressCircle) {
     progressCircle.style.strokeDashoffset = offset;
   }
@@ -2173,16 +2336,16 @@ function showUploadSuccess(fileName, data) {
   const progressContent = document.getElementById('upload-progress-content');
   const successContent = document.getElementById('upload-success-content');
   const fileSuccessIcon = document.getElementById('file-success-icon');
-  
+
   if (defaultContent) defaultContent.classList.add('hidden');
   if (progressContent) progressContent.classList.add('hidden');
   if (successContent) {
     successContent.classList.remove('hidden');
-    
+
     const uploadFileName = document.getElementById('upload-file-name');
     const uploadFileStats = document.getElementById('upload-file-stats');
     const totalItems = data.items.length + data.errors.length + data.duplicates.length;
-    
+
     if (uploadFileName) {
       uploadFileName.textContent = fileName || `Загружено ${totalItems} позиций`;
     }
@@ -2193,7 +2356,7 @@ function showUploadSuccess(fileName, data) {
   if (fileSuccessIcon) {
     fileSuccessIcon.classList.remove('hidden');
   }
-  
+
   // Обработчик кнопки "Заменить файл"
   const replaceFileBtn = document.getElementById('replace-file-btn');
   if (replaceFileBtn) {
@@ -2237,31 +2400,31 @@ function showUploadSuccess(fileName, data) {
  */
 async function handleFileSelect(file) {
   console.log('Обработка файла:', file.name);
-  
+
   try {
     // Проверяем тип файла
     const fileName = file.name.toLowerCase();
     const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
     const isCSV = fileName.endsWith('.csv');
-    
+
     if (!isExcel && !isCSV) {
       showError('Неподдерживаемый формат файла. Используйте .xlsx, .xls или .csv');
       return;
     }
-    
+
     // Показываем прогресс-бар
     showUploadProgress(0, 'Чтение файла...');
-    
+
     let parsedData = [];
     let extractedImages = new Map();
     let imageRowMap = new Map(); // Карта связи изображений со строками
-    
+
     if (isExcel) {
       // Читаем Excel файл (теперь возвращает объект с data и images)
       console.log('📥 Начинаем парсинг Excel файла...');
       console.log('📋 Файл:', file.name, file.size, 'байт');
       updateUploadProgress(20, 'Парсинг Excel файла...');
-      
+
       let result;
       try {
         result = await parseExcelFile(file);
@@ -2278,7 +2441,7 @@ async function handleFileSelect(file) {
         hideUploadProgress();
         throw parseError;
       }
-      
+
       parsedData = result.data || result; // Поддержка старого формата
       extractedImages = result.images || new Map();
       imageRowMap = result.imageRowMap || new Map(); // Карта связи изображений со строками
@@ -2286,7 +2449,7 @@ async function handleFileSelect(file) {
       if (imageRowMap.size > 0) {
         console.log(`📋 Найдена связь для ${imageRowMap.size} изображений со строками`);
       }
-      
+
       if (extractedImages.size === 0) {
         console.warn('⚠️ ВНИМАНИЕ: Изображения не были извлечены из Excel файла!');
         console.warn('Проверьте логи выше, чтобы понять причину.');
@@ -2296,31 +2459,31 @@ async function handleFileSelect(file) {
       updateUploadProgress(30, 'Парсинг CSV файла...');
       parsedData = await parseCSVFile(file);
     }
-    
+
     console.log('📊 Распарсено строк:', parsedData.length);
     updateUploadProgress(50, 'Обработка данных...');
-    
+
     // Валидируем и обрабатываем данные (передаем изображения и карту связей)
     const processedData = await processImportedData(parsedData, extractedImages, imageRowMap);
-    
+
     updateUploadProgress(90, 'Завершение...');
-    
+
     // Сохраняем данные для импорта
     importedData = processedData;
-    
+
     // Сохраняем информацию о файле
     importedData.fileName = file.name;
-    
+
     // Обновляем интерфейс с результатами
     updateImportPreview(processedData, file.name);
-    
+
     // Скрываем прогресс и показываем информацию о файле
     updateUploadProgress(100, 'Готово!');
     setTimeout(() => {
       hideUploadProgress();
       showUploadSuccess(file.name, processedData);
     }, 300);
-    
+
   } catch (error) {
     console.error('Ошибка обработки файла:', error);
     hideUploadProgress();
@@ -2343,7 +2506,7 @@ window.handleFileSelect = handleFileSelect;
 async function extractImagesFromExcel(file) {
   const imagesMap = new Map();
   const imageRowMap = new Map(); // Карта: имя файла изображения -> индекс строки (0-based)
-  
+
   try {
     console.log('🔍 Начинаем извлечение изображений из Excel файла...');
     console.log('📋 Параметры файла:', {
@@ -2352,23 +2515,23 @@ async function extractImagesFromExcel(file) {
       type: file.type,
       lastModified: new Date(file.lastModified).toLocaleString()
     });
-    
+
     // Проверяем, что файл доступен
     if (!file || !file.arrayBuffer) {
       console.error('❌ Файл недоступен или не поддерживает arrayBuffer()');
       return imagesMap;
     }
-    
+
     // Проверяем, что библиотека JSZip загружена
     if (typeof JSZip === 'undefined' && typeof window.JSZip === 'undefined') {
       console.warn('⚠️ Библиотека JSZip не загружена. Изображения не будут извлечены.');
       console.warn('Проверьте, что библиотека JSZip подключена в items-import.html');
       return imagesMap;
     }
-    
+
     const JSZipLib = window.JSZip || JSZip;
     console.log('✅ Библиотека JSZip найдена');
-    
+
     // Читаем файл как ArrayBuffer
     console.log('📖 Читаем файл через arrayBuffer()...');
     let arrayBuffer;
@@ -2387,51 +2550,51 @@ async function extractImagesFromExcel(file) {
       });
       console.log(`✅ Файл прочитан через FileReader. Размер: ${(arrayBuffer.byteLength / 1024).toFixed(2)} КБ`);
     }
-    
+
     // Распаковываем ZIP архив
     console.log('📦 Распаковываем ZIP архив...');
     const zip = await JSZipLib.loadAsync(arrayBuffer);
     console.log('✅ ZIP архив распакован');
-    
+
     // Показываем все папки для отладки
     const allFiles = Object.keys(zip.files);
     console.log(`📁 Всего файлов в архиве: ${allFiles.length}`);
     const folders = new Set(allFiles.map(f => f.split('/')[0]));
     console.log('📂 Папки в архиве:', Array.from(folders));
-    
+
     // Изображения в Excel хранятся в папке xl/media/
     // В JSZip нужно использовать полный путь к файлу, а не получать через folder().file()
     const mediaFolderPath = 'xl/media/';
-    
+
     // Ищем все файлы, которые начинаются с xl/media/ и являются изображениями
     const imageFiles = allFiles.filter(filePath => {
       // Проверяем, что файл находится в папке xl/media/
       if (!filePath.startsWith(mediaFolderPath)) {
         return false;
       }
-      
+
       // Проверяем, что это файл изображения (не папка)
       const lowerName = filePath.toLowerCase();
       return !filePath.endsWith('/') && ( // Не папка
-        lowerName.endsWith('.png') || 
-        lowerName.endsWith('.jpg') || 
-        lowerName.endsWith('.jpeg') || 
+        lowerName.endsWith('.png') ||
+        lowerName.endsWith('.jpg') ||
+        lowerName.endsWith('.jpeg') ||
         lowerName.endsWith('.gif') ||
         lowerName.endsWith('.webp')
       );
     });
-    
+
     console.log(`🖼️ Найдено изображений в Excel: ${imageFiles.length}`);
-    
+
     if (imageFiles.length === 0) {
       console.warn('⚠️ Изображения не найдены в папке xl/media/');
       // Проверяем, есть ли изображения в других местах
       const otherImages = allFiles.filter(filePath => {
         const lowerName = filePath.toLowerCase();
         return !filePath.endsWith('/') && (
-          lowerName.endsWith('.png') || 
-          lowerName.endsWith('.jpg') || 
-          lowerName.endsWith('.jpeg') || 
+          lowerName.endsWith('.png') ||
+          lowerName.endsWith('.jpg') ||
+          lowerName.endsWith('.jpeg') ||
           lowerName.endsWith('.gif') ||
           lowerName.endsWith('.webp')
         );
@@ -2441,9 +2604,9 @@ async function extractImagesFromExcel(file) {
       }
       return imagesMap;
     }
-    
+
     console.log('📸 Первые изображения:', imageFiles.slice(0, 5));
-    
+
     // ВАЖНО: Сначала пытаемся определить связь изображений со строками через XML файлы
     // Это нужно для правильного сопоставления изображений товарам
     try {
@@ -2460,18 +2623,18 @@ async function extractImagesFromExcel(file) {
       console.error('   Стек:', parseError.stack);
       console.warn('⚠️ Не удалось определить связь изображений со строками из XML');
     }
-    
+
     // Извлекаем каждое изображение напрямую из zip по полному пути
     for (const imagePath of imageFiles) {
       try {
         // Получаем файл напрямую из zip по полному пути
         const zipFile = zip.file(imagePath);
-        
+
         if (!zipFile) {
           console.warn(`⚠️ Файл не найден в zip: ${imagePath}`);
           continue;
         }
-        
+
         // Извлекаем данные изображения
         const imageData = await zipFile.async('blob');
         const fileName = imagePath.split('/').pop(); // Получаем только имя файла (например, image1.png)
@@ -2482,12 +2645,12 @@ async function extractImagesFromExcel(file) {
         console.warn('Детали ошибки:', error.message);
       }
     }
-    
+
     console.log(`✅ Извлечение завершено. Всего извлечено: ${imagesMap.size} изображений`);
     if (imageRowMap.size > 0) {
       console.log(`📋 Определена связь для ${imageRowMap.size} изображений со строками`);
     }
-    
+
     return { images: imagesMap, imageRowMap: imageRowMap };
   } catch (error) {
     console.error('❌ Ошибка извлечения изображений из Excel:', error);
@@ -2507,42 +2670,42 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
   console.log(`🔍 Начинаем parseImageRowMappings: ${imageFiles.length} изображений для обработки`);
   try {
     // Ищем файл worksheet (обычно xl/worksheets/sheet1.xml)
-    const worksheetFiles = Object.keys(zip.files).filter(path => 
+    const worksheetFiles = Object.keys(zip.files).filter(path =>
       path.startsWith('xl/worksheets/sheet') && path.endsWith('.xml')
     );
-    
+
     console.log(`📄 Найдено worksheet файлов: ${worksheetFiles.length}`);
-    
+
     if (worksheetFiles.length === 0) {
       console.warn('⚠️ Файлы worksheet не найдены');
       return;
     }
-    
+
     // Используем первый лист
     const worksheetPath = worksheetFiles[0];
     const worksheetFile = zip.file(worksheetPath);
-    
+
     if (!worksheetFile) {
       console.warn(`⚠️ Файл worksheet не найден: ${worksheetPath}`);
       return;
     }
-    
+
     // Читаем XML worksheet
     const worksheetXml = await worksheetFile.async('string');
     const parser = new DOMParser();
     const worksheetDoc = parser.parseFromString(worksheetXml, 'text/xml');
-    
+
     // Ищем все элементы drawing (изображения)
     const drawings = worksheetDoc.getElementsByTagName('drawing');
-    
+
     console.log(`🖼️ Найдено элементов drawing: ${drawings.length}`);
-    
+
     if (drawings.length === 0) {
       console.warn('⚠️ Элементы drawing не найдены в worksheet');
       console.warn('   Это может означать, что изображения встроены нестандартным способом');
       return;
     }
-    
+
     // Получаем rId из атрибута r:id (например, "rId1")
     const drawingRIds = [];
     for (let i = 0; i < drawings.length; i++) {
@@ -2551,35 +2714,35 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
         drawingRIds.push(rId);
       }
     }
-    
+
     console.log(`📋 Найдено ${drawingRIds.length} элементов drawing в worksheet`);
-    
+
     // Находим файл relationships для worksheet
     const sheetNumber = worksheetPath.match(/sheet(\d+)\.xml/)?.[1] || '1';
     const relsPath = `xl/worksheets/_rels/sheet${sheetNumber}.xml.rels`;
     const relsFile = zip.file(relsPath);
-    
+
     if (!relsFile) {
       console.warn(`⚠️ Файл relationships не найден: ${relsPath}`);
       return;
     }
-    
+
     // Читаем relationships XML
     const relsXml = await relsFile.async('string');
     const relsDoc = parser.parseFromString(relsXml, 'text/xml');
-    
+
     // Находим связь между drawing и файлом drawings
     const relationships = relsDoc.getElementsByTagName('Relationship');
     const drawingRelations = new Map();
-    
+
     for (let i = 0; i < relationships.length; i++) {
       const rel = relationships[i];
       const id = rel.getAttribute('Id');
       const target = rel.getAttribute('Target');
       const type = rel.getAttribute('Type');
-      
+
       console.log(`   Relationship ${i}: Id="${id}", Type="${type}", Target="${target}"`);
-      
+
       // Ищем связи с типом drawing
       if (type && type.includes('drawing')) {
         // Преобразуем относительный путь в абсолютный
@@ -2600,7 +2763,7 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
           // Просто имя файла -> "xl/drawings/drawing1.xml"
           fullPath = `xl/drawings/${target}`;
         }
-        
+
         // Нормализуем путь: убираем все "../" и двойные слеши
         // Например: "xl/drawings/../drawings/drawing1.xml" -> "xl/drawings/drawing1.xml"
         const pathParts = fullPath.split('/');
@@ -2613,29 +2776,29 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
           }
         }
         fullPath = normalizedParts.join('/');
-        
+
         console.log(`   ✅ Drawing relation: ${id} -> "${target}" -> "${fullPath}"`);
         drawingRelations.set(id, fullPath);
       }
     }
-    
+
     // Создаем массив для хранения информации о связи изображений со строками
     const imageRowMappings = [];
-    
+
     console.log(`📋 Найдено drawing RIds: ${drawingRIds.length}`, drawingRIds);
     console.log(`📋 Найдено drawing relations: ${drawingRelations.size}`);
     console.log(`📋 Drawing relations:`, Array.from(drawingRelations.entries()));
-    
+
     // Проходим по всем drawing файлам и извлекаем информацию о позициях изображений
     for (const rId of drawingRIds) {
       const drawingPath = drawingRelations.get(rId);
       console.log(`🔍 Обрабатываем rId "${rId}": drawingPath = "${drawingPath}"`);
-      
+
       if (!drawingPath) {
         console.warn(`⚠️ Для rId "${rId}" не найден drawingPath в drawingRelations`);
         continue;
       }
-      
+
       const drawingFile = zip.file(drawingPath);
       if (!drawingFile) {
         console.error(`❌ Drawing файл не найден в zip: ${drawingPath}`);
@@ -2644,25 +2807,25 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
         console.error(`   Найдено файлов:`, drawingsFiles);
         continue;
       }
-      
+
       console.log(`✅ Drawing файл найден: ${drawingPath}`);
-      
+
       try {
         console.log(`📖 Читаем drawing файл: ${drawingPath}`);
         const drawingXml = await drawingFile.async('string');
         console.log(`✅ Drawing файл прочитан, размер: ${drawingXml.length} символов`);
-        
+
         const drawingDoc = parser.parseFromString(drawingXml, 'text/xml');
-        
+
         // Проверяем на ошибки парсинга
         const parserError = drawingDoc.querySelector('parsererror');
         if (parserError) {
           console.error(`❌ Ошибка парсинга XML в ${drawingPath}:`, parserError.textContent);
           continue;
         }
-        
+
         console.log(`🔍 Ищем anchors в drawing файле...`);
-        
+
         // Ищем элементы twoCellAnchor (позиция изображения между двумя ячейками)
         // Также проверяем oneCellAnchor (изображение в одной ячейке)
         let anchors = drawingDoc.getElementsByTagName('xdr:twoCellAnchor');
@@ -2671,7 +2834,7 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
           anchors = drawingDoc.getElementsByTagName('twoCellAnchor');
           console.log(`   twoCellAnchor найдено: ${anchors.length}`);
         }
-        
+
         // Пробуем также oneCellAnchor
         let oneCellAnchors = drawingDoc.getElementsByTagName('xdr:oneCellAnchor');
         console.log(`   xdr:oneCellAnchor найдено: ${oneCellAnchors.length}`);
@@ -2679,12 +2842,12 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
           oneCellAnchors = drawingDoc.getElementsByTagName('oneCellAnchor');
           console.log(`   oneCellAnchor найдено: ${oneCellAnchors.length}`);
         }
-        
+
         // Объединяем все anchors
         const allAnchors = [...Array.from(anchors), ...Array.from(oneCellAnchors)];
-        
+
         console.log(`🔍 Найдено anchors в drawing файле ${drawingPath}: ${allAnchors.length}`);
-        
+
         if (allAnchors.length === 0) {
           console.error(`❌ КРИТИЧЕСКАЯ ПРОБЛЕМА: Не найдено ни одного anchor в drawing файле!`);
           console.error(`   Проверяем структуру XML...`);
@@ -2692,7 +2855,7 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
           console.error(`   Начало XML:`, drawingXml.substring(0, 500));
           // Пробуем найти элементы через другие методы (без querySelectorAll, так как он не поддерживает XPath функции)
           const allElements = drawingDoc.getElementsByTagName('*');
-          const anchorLikeElements = Array.from(allElements).filter(el => 
+          const anchorLikeElements = Array.from(allElements).filter(el =>
             el.tagName && (el.tagName.includes('Anchor') || el.tagName.includes('anchor'))
           );
           console.error(`   Элементы с "anchor" в имени (через getElementsByTagName): ${anchorLikeElements.length}`);
@@ -2700,23 +2863,23 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
             console.error(`   Примеры:`, anchorLikeElements.slice(0, 3).map(el => el.tagName));
           }
         }
-        
+
         console.log(`🔄 Начинаем обработку ${allAnchors.length} anchors...`);
-        
+
         for (let i = 0; i < allAnchors.length; i++) {
           const anchor = allAnchors[i];
-          
+
           // Логируем первые несколько anchors для отладки
           if (i < 3) {
             console.log(`🔍 Обрабатываем anchor ${i}, tagName: ${anchor.tagName}`);
           }
-          
+
           // Ищем элемент from с разными вариантами пространств имен
           let from = anchor.getElementsByTagName('xdr:from')[0];
           if (!from) {
             from = anchor.getElementsByTagName('from')[0];
           }
-          
+
           if (!from) {
             if (i < 5) {
               console.warn(`⚠️ Anchor ${i}: элемент 'from' не найден`);
@@ -2725,19 +2888,19 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
             }
             continue;
           }
-          
+
           // Ищем элемент row
           let rowElem = from.getElementsByTagName('xdr:row')[0];
           if (!rowElem) {
             rowElem = from.getElementsByTagName('row')[0];
           }
-          
+
           if (!rowElem || rowElem.textContent === null || rowElem.textContent === undefined) {
             console.warn(`⚠️ Anchor ${i}: элемент 'row' не найден или пустой`);
             console.warn(`   Дочерние элементы 'from':`, Array.from(from.children).map(c => `${c.tagName}=${c.textContent}`));
             continue;
           }
-          
+
           const row = parseInt(rowElem.textContent, 10);
           // ВАЖНО: В Excel XML нумерация строк может быть 0-based или 1-based
           // Проверяем: если row = 0, то это может быть 0-based (первая строка данных = 0)
@@ -2745,21 +2908,21 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
           console.log(`📊 Anchor ${i}: найдена строка ${row} (textContent: "${rowElem.textContent}")`);
           console.log(`   → Если 1-based: строка Excel ${row}, индекс данных ${row - 2}, артикул ${row - 1}`);
           console.log(`   → Если 0-based: строка Excel ${row + 1}, индекс данных ${row}, артикул ${row + 1}`);
-          
+
           // Используем row как есть (обычно это 1-based, где 1 = первая строка Excel)
-          
+
           // Пропускаем строку 0 (заголовки)
           if (isNaN(row) || row < 1) {
             console.warn(`⚠️ Anchor ${i}: строка ${row} невалидна, пропускаем`);
             continue;
           }
-          
+
           // Ищем связанное изображение через blip
           let blip = anchor.getElementsByTagName('a:blip')[0];
           if (!blip) {
             blip = anchor.getElementsByTagName('blip')[0];
           }
-          
+
           if (!blip) {
             if (i < 5) {
               console.warn(`⚠️ Anchor ${i}: элемент 'blip' не найден`);
@@ -2771,14 +2934,14 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
             }
             continue;
           }
-          
+
           // Пробуем разные варианты атрибута embed
           const embed = blip.getAttribute('r:embed') || blip.getAttribute('embed') || blip.getAttribute('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed');
-          
+
           if (i < 5) {
             console.log(`   Anchor ${i}: найден blip, embed = "${embed}"`);
           }
-          
+
           if (!embed) {
             if (i < 5) {
               console.warn(`⚠️ Anchor ${i}: атрибут 'embed' не найден в blip`);
@@ -2786,40 +2949,40 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
             }
             continue;
           }
-          
+
           if (i < 5) {
             console.log(`🔗 Anchor ${i}: найден embed ID "${embed}"`);
           }
-          
+
           // Находим файл изображения через relationships
           const drawingFileName = drawingPath.split('/').pop();
           const imageRelPath = `xl/drawings/_rels/${drawingFileName}.rels`;
           const imageRelsFile = zip.file(imageRelPath);
-          
+
           if (imageRelsFile) {
             try {
               const imageRelsXml = await imageRelsFile.async('string');
               const imageRelsDoc = parser.parseFromString(imageRelsXml, 'text/xml');
               const imageRels = imageRelsDoc.getElementsByTagName('Relationship');
-              
+
               if (i < 5) {
                 console.log(`📋 В relationships файле найдено ${imageRels.length} связей, ищем embed ID "${embed}"`);
               }
-              
+
               let foundRel = false;
               for (let j = 0; j < imageRels.length; j++) {
                 const rel = imageRels[j];
                 const relId = rel.getAttribute('Id');
-                
+
                 if (i < 5) {
                   console.log(`   Связь ${j}: Id="${relId}", Target="${rel.getAttribute('Target')}"`);
                 }
-                
+
                 if (relId === embed) {
                   foundRel = true;
                   const imageTarget = rel.getAttribute('Target');
                   if (!imageTarget) continue;
-                  
+
                   // Правильно определяем путь к изображению
                   // Target в relationships может быть: "../media/image1.png" или "media/image1.png"
                   let fullImagePath;
@@ -2835,15 +2998,15 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
                     // Просто имя файла -> "xl/media/image1.png"
                     fullImagePath = `xl/media/${imageTarget}`;
                   }
-                  
+
                   const fileName = fullImagePath.split('/').pop();
-                  
+
                   // Проверяем, что файл действительно существует в списке изображений
                   const imageFileExists = imageFiles.some(path => path.includes(fileName));
                   if (!imageFileExists) {
                     console.warn(`⚠️ Изображение "${fileName}" найдено в XML, но не найдено в списке файлов`);
                   }
-                  
+
                   // В Excel нумерация строк начинается с 1
                   // row в XML - это номер строки в Excel (1-based)
                   // В Excel: строка 1 = заголовки, строка 2 = первая строка данных (артикул 1, индекс 0)
@@ -2853,10 +3016,10 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
                   // row = 2 (первая строка данных) -> dataIndex = 0 ✓
                   // row = 3 (вторая строка данных) -> dataIndex = 1 ✓
                   const dataIndex = row - 2; // row = 2 -> index = 0, row = 3 -> index = 1
-                  
+
                   // Детальное логирование для отладки
                   console.log(`📊 XML: row=${row} -> dataIndex=${dataIndex} -> артикул должен быть ${dataIndex + 1}`);
-                  
+
                   // Пропускаем строку 1 (заголовки) и строки с отрицательным индексом
                   if (dataIndex >= 0 && row >= 2) {
                     imageRowMappings.push({
@@ -2871,7 +3034,7 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
                   break;
                 }
               }
-              
+
               if (!foundRel) {
                 console.error(`❌ Embed ID "${embed}" не найден в relationships файле!`);
                 console.error(`   Доступные ID:`, Array.from(imageRels).map(r => r.getAttribute('Id')));
@@ -2891,10 +3054,10 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
         console.warn(`⚠️ Ошибка парсинга drawing файла ${drawingPath}:`, drawingError.message);
       }
     }
-    
+
     // Сортируем связи по номеру строки в Excel для правильного порядка
     imageRowMappings.sort((a, b) => a.rowExcel - b.rowExcel);
-    
+
     // Выводим информацию о найденных связях
     console.log(`📋 Найдено ${imageRowMappings.length} связей изображений со строками:`);
     for (let i = 0; i < Math.min(imageRowMappings.length, 10); i++) {
@@ -2904,7 +3067,7 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
     if (imageRowMappings.length > 10) {
       console.log(`  ... и еще ${imageRowMappings.length - 10} связей`);
     }
-    
+
     // Сохраняем все найденные связи в карту
     for (let i = 0; i < imageRowMappings.length; i++) {
       const mapping = imageRowMappings[i];
@@ -2913,11 +3076,11 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
         console.log(`✅ Сохранена связь: "${mapping.fileName}" -> индекс ${mapping.dataIndex} (строка Excel ${mapping.rowExcel})`);
       }
     }
-    
+
     if (imageRowMappings.length > 5) {
       console.log(`✅ ... и еще ${imageRowMappings.length - 5} связей сохранено`);
     }
-    
+
     // Если не удалось определить связи из XML
     if (imageRowMappings.length === 0 && imageFiles.length > 0) {
       console.error('❌ КРИТИЧЕСКАЯ ПРОБЛЕМА: Не удалось определить связи изображений со строками из XML!');
@@ -2949,7 +3112,7 @@ async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
 function parseExcelFile(file) {
   return new Promise(async (resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = async (e) => {
       try {
         // Проверяем, что библиотека xlsx загружена
@@ -2957,38 +3120,38 @@ function parseExcelFile(file) {
           reject(new Error('Библиотека для чтения Excel не загружена. Обновите страницу.'));
           return;
         }
-        
+
         // Используем глобальную библиотеку xlsx
         const XLSXLib = window.XLSX || XLSX;
-        
+
         // Читаем данные из файла
         const data = new Uint8Array(e.target.result);
         // Парсим Excel с помощью библиотеки xlsx
         const workbook = XLSXLib.read(data, { type: 'array' });
-        
+
         // Берем первый лист
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        
+
         // Преобразуем в JSON (массив объектов)
         const jsonData = XLSXLib.utils.sheet_to_json(worksheet, {
           header: 1, // Используем первую строку как заголовки
           defval: '' // Значение по умолчанию для пустых ячеек
         });
-        
+
         if (jsonData.length < 2) {
           reject(new Error('Файл пуст или содержит только заголовки'));
           return;
         }
-        
+
         // Первая строка - заголовки
         const headers = jsonData[0].map(h => String(h).trim().toLowerCase());
         console.log('Заголовки из Excel:', headers);
-        
+
         // Остальные строки - данные
         const rows = jsonData.slice(1);
         console.log('Всего строк данных:', rows.length);
-        
+
         // Преобразуем в массив объектов
         // Фильтруем строки: оставляем только те, где есть хотя бы одно непустое значение
         // и при этом есть значение в колонке "название" (обязательное поле)
@@ -2997,14 +3160,14 @@ function parseExcelFile(file) {
             // Проверяем, что строка не полностью пустая
             const hasData = row.some(cell => cell !== '' && cell !== null && cell !== undefined);
             if (!hasData) return false;
-            
+
             // Проверяем, что есть название (это обязательное поле)
             const nameIndex = headers.indexOf('название');
             if (nameIndex >= 0 && row[nameIndex]) {
               const nameValue = String(row[nameIndex]).trim();
               return nameValue !== '';
             }
-            
+
             // Если колонка "название" не найдена, но есть данные - оставляем строку
             return hasData;
           })
@@ -3013,8 +3176,8 @@ function parseExcelFile(file) {
             headers.forEach((header, index) => {
               const value = row[index];
               // Обрабатываем значения: null, undefined, пустые строки
-              item[header] = (value !== null && value !== undefined && value !== '') 
-                ? String(value).trim() 
+              item[header] = (value !== null && value !== undefined && value !== '')
+                ? String(value).trim()
                 : '';
             });
             // ВАЖНО: Сохраняем номер строки Excel для правильной привязки изображений
@@ -3026,12 +3189,12 @@ function parseExcelFile(file) {
             item._excelRowNumber = rowIndex + 2;
             return item;
           });
-        
+
         console.log('✅ Преобразовано объектов:', result.length);
         if (result.length > 0) {
           console.log('📋 Пример первого объекта:', result[0]);
         }
-        
+
         // Извлекаем изображения из Excel файла
         console.log('═══════════════════════════════════════');
         console.log('🔄 ЭТАП: Начинаем извлечение изображений из Excel...');
@@ -3043,7 +3206,7 @@ function parseExcelFile(file) {
         });
         console.log('📋 Проверка библиотеки JSZip:', typeof JSZip !== 'undefined' || typeof window.JSZip !== 'undefined');
         console.log('📁 Файл для извлечения:', file.name, file.size, 'байт');
-        
+
         let imagesResult = { images: new Map(), imageRowMap: new Map() };
         try {
           imagesResult = await extractImagesFromExcel(file);
@@ -3062,7 +3225,7 @@ function parseExcelFile(file) {
           // Продолжаем работу даже если извлечение изображений не удалось
           imagesResult = { images: new Map(), imageRowMap: new Map() };
         }
-        
+
         resolve({
           data: result,
           images: imagesResult.images,
@@ -3072,11 +3235,11 @@ function parseExcelFile(file) {
         reject(new Error('Ошибка чтения Excel файла: ' + error.message));
       }
     };
-    
+
     reader.onerror = () => {
       reject(new Error('Не удалось прочитать файл'));
     };
-    
+
     reader.readAsArrayBuffer(file);
   });
 }
@@ -3090,21 +3253,21 @@ function parseExcelFile(file) {
 function parseCSVFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       try {
         const text = e.target.result;
         const lines = text.split('\n').filter(line => line.trim() !== '');
-        
+
         if (lines.length < 2) {
           reject(new Error('Файл пуст или содержит только заголовки'));
           return;
         }
-        
+
         // Парсим CSV (простая версия, поддерживает запятые и точки с запятой)
         const delimiter = text.includes(';') ? ';' : ',';
         const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase().replace(/"/g, ''));
-        
+
         const result = lines.slice(1)
           .filter(line => line.trim() !== '')
           .map(line => {
@@ -3115,17 +3278,17 @@ function parseCSVFile(file) {
             });
             return item;
           });
-        
+
         resolve(result);
       } catch (error) {
         reject(new Error('Ошибка чтения CSV файла: ' + error.message));
       }
     };
-    
+
     reader.onerror = () => {
       reject(new Error('Не удалось прочитать файл'));
     };
-    
+
     reader.readAsText(file, 'UTF-8');
   });
 }
@@ -3138,16 +3301,16 @@ function parseCSVFile(file) {
  */
 function createSlug(text) {
   if (!text || typeof text !== 'string') return '';
-  
+
   // Карта транслитерации кириллицы в латиницу
   const translitMap = {
-    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 
-    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 
-    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 
-    'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '', 
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '',
     'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
   };
-  
+
   return text
     .toLowerCase()
     .split('')
@@ -3169,7 +3332,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
   console.log(`📦 Начинаем обработку данных:`);
   console.log(`   Строк данных: ${rawData.length}`);
   console.log(`   Изображений извлечено: ${extractedImages.size}`);
-  
+
   // НОВАЯ ЛОГИКА: игнорируем XML координаты (imageRowMap)
   // Сортируем изображения по имени файла и привязываем последовательно
   const sortedImages = Array.from(extractedImages.entries())
@@ -3179,38 +3342,38 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       const numB = parseInt(b[0].match(/\d+/)?.[0] || '0');
       return numA - numB;
     });
-  
+
   console.log(`   📊 Изображения отсортированы по именам файлов`);
   if (sortedImages.length > 0) {
     console.log(`   📋 Первые изображения:`, sortedImages.slice(0, 5).map(([name]) => name).join(', '));
   }
-  
+
   // Список строк Excel БЕЗ картинок (пропускаем их при привязке изображений)
   const rowsWithoutImages = new Set([18, 20, 68, 69, 73, 80, 90, 99, 100, 107, 109, 130, 142, 149]);
   console.log(`   🚫 Строки без картинок (${rowsWithoutImages.size} шт):`, Array.from(rowsWithoutImages).sort((a, b) => a - b).join(', '));
-  
+
   // Счётчик для последовательной привязки изображений к строкам с товарами
   let imageIndex = 0;
-  
+
   // Получаем все существующие товары для проверки дубликатов
   const existingItems = await items.getAllItems();
-  
+
   // Импортируем функцию для загрузки изображений в Supabase Storage
   const { uploadFileToStorage } = await import('./supabase.js');
-  
+
   const processed = {
     items: [],
     errors: [],
     duplicates: []
   };
-  
+
   // Set для отслеживания дубликатов внутри импортируемого файла
   // Ключ = "название|описание|артикул|фото" (все 4 поля)
   const importedDuplicateKeys = new Set();
-  
+
   // Set для отслеживания артикулов внутри файла (для проверки конфликтов)
   const importedSkus = new Set();
-  
+
   // Маппинг русских названий столбцов на английские
   // Важно: ключи должны быть в нижнем регистре, так как заголовки нормализуются
   const columnMapping = {
@@ -3242,31 +3405,31 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
     'picture': 'photo',
     'url': 'photo' // Если колонка называется просто "url", это может быть изображение
   };
-  
+
   console.log('Обработка данных. Всего строк:', rawData.length);
   console.log('Пример первой строки:', rawData[0]);
-  
+
   // Логируем все найденные колонки для отладки
   if (rawData.length > 0) {
     const allColumns = Object.keys(rawData[0]);
     console.log('Найденные колонки в файле:', allColumns);
-    console.log('Колонки, которые будут распознаны как изображения:', 
+    console.log('Колонки, которые будут распознаны как изображения:',
       allColumns.filter(col => columnMapping[col.toLowerCase()] === 'photo'));
   }
-  
+
   rawData.forEach((row, index) => {
     // Используем _excelRowNumber если есть, иначе вычисляем из индекса
     // В Excel: строка 1 = заголовки, строка 2 = первая строка данных (index = 0)
     // ПРАВИЛЬНАЯ ФОРМУЛА: index + 2
     const rowNumber = row._excelRowNumber || (index + 2); // +2 потому что первая строка - заголовки, нумерация с 1
-    
+
     // Преобразуем ключи в нижний регистр и нормализуем
     const normalizedRow = {};
     Object.keys(row).forEach(key => {
       const normalizedKey = columnMapping[key.toLowerCase()] || key.toLowerCase();
       normalizedRow[normalizedKey] = row[key];
     });
-    
+
     // Логируем первые несколько строк для отладки
     if (index < 3) {
       console.log(`Строка ${rowNumber}:`, { оригинал: row, нормализовано: normalizedRow });
@@ -3277,9 +3440,9 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
         // Проверяем, есть ли в оригинале колонка с изображением, которая не была распознана
         const imageColumns = Object.keys(row).filter(col => {
           const colLower = col.toLowerCase();
-          return colLower.includes('фото') || colLower.includes('image') || 
-                 colLower.includes('photo') || colLower.includes('img') ||
-                 colLower.includes('изображение') || colLower.includes('картинка');
+          return colLower.includes('фото') || colLower.includes('image') ||
+            colLower.includes('photo') || colLower.includes('img') ||
+            colLower.includes('изображение') || colLower.includes('картинка');
         });
         if (imageColumns.length > 0) {
           console.log(`  → ВНИМАНИЕ: Найдена колонка, похожая на изображение, но не распознанная:`, imageColumns);
@@ -3289,7 +3452,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
         }
       }
     }
-    
+
     // Валидация
     const name = (normalizedRow.name || '').trim();
     const sku = (normalizedRow.sku || '').trim();
@@ -3297,7 +3460,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
     const category = (normalizedRow.category || '').trim();
     const location = (normalizedRow.location || '').trim();
     const description = (normalizedRow.description || '').trim();
-    
+
     // Проверка обязательных полей
     if (!name) {
       processed.errors.push({
@@ -3307,7 +3470,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       });
       return;
     }
-    
+
     // Проверка обязательного поля: артикул
     if (!sku) {
       processed.errors.push({
@@ -3317,7 +3480,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       });
       return;
     }
-    
+
     // Проверка обязательного поля: категория
     if (!category) {
       processed.errors.push({
@@ -3327,7 +3490,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       });
       return;
     }
-    
+
     // Проверка обязательного поля: место хранения
     if (!location) {
       processed.errors.push({
@@ -3337,7 +3500,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       });
       return;
     }
-    
+
     // Проверка обязательного поля: единица измерения
     if (!unit) {
       processed.errors.push({
@@ -3347,12 +3510,12 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       });
       return;
     }
-    
+
     // ВАЖНО: Обрабатываем изображения ДО проверки на дубликаты,
     // чтобы изображения были доступны и для дубликатов
     // Обрабатываем поле "фото" - может быть URL или путь к изображению
     let imageUrl = null;
-    
+
     // Проверяем normalizedRow.photo (после маппинга)
     if (normalizedRow.photo) {
       const photoValue = String(normalizedRow.photo).trim();
@@ -3371,17 +3534,17 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
         }
       }
     }
-    
+
     // Также проверяем оригинальные ключи на случай, если маппинг не сработал
     // Ищем любую колонку, которая может содержать изображение
     if (!imageUrl) {
       Object.keys(row).forEach(key => {
         const keyLower = key.toLowerCase();
         // Если это похоже на колонку с изображением
-        if ((keyLower.includes('фото') || keyLower.includes('image') || 
-             keyLower.includes('photo') || keyLower.includes('img') ||
-             keyLower.includes('изображение') || keyLower.includes('картинка') ||
-             keyLower === 'url') && row[key]) {
+        if ((keyLower.includes('фото') || keyLower.includes('image') ||
+          keyLower.includes('photo') || keyLower.includes('img') ||
+          keyLower.includes('изображение') || keyLower.includes('картинка') ||
+          keyLower === 'url') && row[key]) {
           const value = String(row[key]).trim();
           if (value && value !== 'null' && value !== 'undefined' && value !== '') {
             imageUrl = value;
@@ -3390,16 +3553,16 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
         }
       });
     }
-    
+
     // НОВАЯ ЛОГИКА: последовательная привязка изображений к непустым строкам
     // Игнорируем XML координаты, так как изображения размещены "поверх" таблицы
     if (!imageUrl && sortedImages.length > 0) {
       let matchedImage = null;
       let matchedFileName = null;
-      
+
       console.log(`\n🔍 ====== СТРОКА EXCEL ${rowNumber} ======`);
       console.log(`   📝 Товар: "${name.substring(0, 40)}..."`);
-      
+
       // ВАЖНО: Проверяем, не входит ли эта строка Excel в список строк БЕЗ картинок
       if (rowsWithoutImages.has(rowNumber)) {
         console.log(`   🚫 Строка Excel ${rowNumber} в списке БЕЗ картинок`);
@@ -3416,29 +3579,29 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
           matchedImage = imageBlob;
           matchedFileName = fileName;
           imageIndex++; // Переходим к следующему изображению
-          
+
           console.log(`   ✅ Привязано изображение #${imageIndex}: "${fileName}"`);
           console.log(`   🔢 Осталось изображений: ${sortedImages.length - imageIndex}`);
-          
+
           // Извлекаем расширение из оригинального файла
           let fileExtension = 'png'; // По умолчанию png
           if (matchedFileName && matchedFileName.includes('.')) {
             const parts = matchedFileName.split('.');
             fileExtension = parts[parts.length - 1].toLowerCase();
           }
-          
+
           // Создаём slug из названия товара
           const slug = createSlug(name);
-          
+
           // Формируем имя в формате {slug}.{расширение}
           const finalFileName = slug ? `${slug}.${fileExtension}` : `image${imageIndex}.${fileExtension}`;
-          
+
           normalizedRow._extractedImage = {
             blob: matchedImage,
             fileName: finalFileName,
             originalFileName: matchedFileName
           };
-          
+
           console.log(`   📎 ✅ РЕЗУЛЬТАТ: "${matchedFileName}" → "${finalFileName}"`);
           console.log(`   🏷️ Slug: "${slug}" (из: "${name.substring(0, 30)}...")\n`);
         } else {
@@ -3457,7 +3620,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       // Если изображений вообще нет в файле
       normalizedRow._extractedImage = null;
     }
-    
+
     // Сохраняем обработанное изображение в normalizedRow для использования в дубликатах
     // ВАЖНО: Если изображение не найдено (_extractedImage === null и нет imageUrl), то image_url должен быть null
     if (normalizedRow._extractedImage === null && !imageUrl) {
@@ -3465,7 +3628,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
     } else {
       normalizedRow.image_url = imageUrl || null; // Используем URL из колонки, если есть, иначе null
     }
-    
+
     // Логируем все изображения для отладки
     if (normalizedRow._extractedImage) {
       console.log(`✓ Строка ${rowNumber} (${name}): изображение "${normalizedRow._extractedImage.fileName}" будет загружено`);
@@ -3474,7 +3637,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
     } else {
       console.log(`✗ Строка ${rowNumber} (${name}): изображение отсутствует, image_url = null`);
     }
-    
+
     // Получаем URL изображения для сравнения
     // Для извлечённых изображений используем имя файла, для URL - сам URL
     let currentImageIdentifier = null;
@@ -3488,29 +3651,29 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
         currentImageIdentifier = imageUrl.split('/').pop().toLowerCase();
       }
     }
-    
+
     // Проверка на дубликаты: ПОЛНОЕ совпадение ВСЕХ 4 полей
     // Дубликат = название + описание + артикул + фото полностью идентичны
     let isDuplicate = false;
     let existingItem = null;
-    
+
     const normalizedSku = String(sku).trim().toLowerCase();
     const descLower = description ? description.toLowerCase() : '';
-    
+
     // Сначала проверяем дубликаты в СУЩЕСТВУЮЩЕЙ базе данных
     existingItem = existingItems.find(item => {
       // Сравниваем название
       const itemName = (item.name || '').toLowerCase().trim();
       if (itemName !== name.toLowerCase()) return false;
-      
+
       // Сравниваем описание
       const itemDesc = (item.description || '').toLowerCase().trim();
       if (itemDesc !== descLower) return false;
-      
+
       // Сравниваем артикул
       const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
       if (itemSku !== normalizedSku) return false;
-      
+
       // Сравниваем фото (по имени файла или URL)
       let itemImageIdentifier = null;
       // Проверяем, что image_url существует И является строкой
@@ -3522,7 +3685,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
           itemImageIdentifier = item.image_url.split('/').pop().toLowerCase();
         }
       }
-      
+
       // Если оба пустые - это совпадение
       if (!currentImageIdentifier && !itemImageIdentifier) return true;
       // Если только один пустой - не совпадение
@@ -3530,16 +3693,16 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       // Сравниваем идентификаторы изображений
       return currentImageIdentifier === itemImageIdentifier;
     });
-    
+
     if (existingItem) {
       isDuplicate = true;
     }
-    
+
     // Если не нашли в базе, проверяем дубликаты ВНУТРИ импортируемого файла
     if (!isDuplicate) {
       // Создаём уникальный ключ из всех 4 полей для сравнения
       const duplicateKey = `${name.toLowerCase()}|${descLower}|${normalizedSku}|${currentImageIdentifier || ''}`;
-      
+
       if (importedDuplicateKeys.has(duplicateKey)) {
         // Нашли дубликат внутри файла - добавляем как дубликат
         // Находим первую запись с таким же ключом
@@ -3549,7 +3712,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
           let itemImageId = null;
           if (item._extractedImage && item._extractedImage.fileName) {
             itemImageId = item._extractedImage.fileName.toLowerCase();
-          // Проверяем, что image_url существует И является строкой
+            // Проверяем, что image_url существует И является строкой
           } else if (item.image_url && typeof item.image_url === 'string') {
             try {
               const url = new URL(item.image_url);
@@ -3561,7 +3724,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
           const itemKey = `${item.name.toLowerCase()}|${itemDesc}|${itemSku}|${itemImageId || ''}`;
           return itemKey === duplicateKey;
         });
-        
+
         if (firstItem) {
           processed.duplicates.push({
             row: rowNumber,
@@ -3573,7 +3736,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
           return;
         }
       }
-      
+
       // Проверяем конфликт артикулов внутри файла
       // Если артикул уже встречался, проверяем обязательные поля
       if (importedSkus.has(normalizedSku)) {
@@ -3582,19 +3745,19 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
           const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
           return itemSku === normalizedSku;
         });
-        
+
         if (firstItemWithSku) {
           // Проверяем совпадают ли все обязательные поля
           const itemName = (firstItemWithSku.name || '').toLowerCase().trim();
           const itemCategory = (firstItemWithSku.category || '').toLowerCase().trim();
           const itemLocation = (firstItemWithSku.location || '').toLowerCase().trim();
           const itemUnit = (firstItemWithSku.unit || '').toLowerCase().trim();
-          
+
           const nameMatches = itemName === name.toLowerCase();
           const categoryMatches = itemCategory === category.toLowerCase();
           const locationMatches = itemLocation === location.toLowerCase();
           const unitMatches = itemUnit === unit.toLowerCase();
-          
+
           // Если ВСЕ обязательные поля совпадают → это дубликат
           if (nameMatches && categoryMatches && locationMatches && unitMatches) {
             processed.duplicates.push({
@@ -3607,7 +3770,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
             return;
           }
         }
-        
+
         // Если обязательные поля отличаются → ошибка (конфликт артикулов)
         processed.errors.push({
           row: rowNumber,
@@ -3616,13 +3779,13 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
         });
         return;
       }
-      
+
       // Добавляем ключ для отслеживания дубликатов внутри файла
       importedDuplicateKeys.add(duplicateKey);
       // Добавляем артикул для отслеживания конфликтов
       importedSkus.add(normalizedSku);
     }
-    
+
     // Если это дубликат с существующим в базе товаром
     if (isDuplicate && existingItem) {
       processed.duplicates.push({
@@ -3634,7 +3797,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       console.log(`Дубликат с базой для "${name}":`, existingItem);
       return; // НЕ добавляем дубликат в список для импорта
     }
-    
+
     // Проверка: артикул совпадает с базой
     // Если все обязательные поля идентичны → дубликат
     // Если обязательные поля отличаются → ошибка (конфликт артикулов)
@@ -3643,26 +3806,26 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
         const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
         return itemSku !== '' && itemSku === normalizedSku;
       });
-      
+
       if (itemWithSameSku) {
         // Проверяем совпадают ли все обязательные поля
         const itemName = (itemWithSameSku.name || '').toLowerCase().trim();
         const itemCategory = (itemWithSameSku.category || '').toLowerCase().trim();
         const itemLocation = (itemWithSameSku.location || '').toLowerCase().trim();
         const itemUnit = (itemWithSameSku.unit || '').toLowerCase().trim();
-        
+
         const nameMatches = itemName === name.toLowerCase();
         const categoryMatches = itemCategory === category.toLowerCase();
         const locationMatches = itemLocation === location.toLowerCase();
         const unitMatches = itemUnit === unit.toLowerCase();
-        
+
         // Логируем сравнение для отладки
         console.log(`🔍 Сравнение с базой для артикула "${sku}":`);
         console.log(`   Название: файл="${name}" vs база="${itemWithSameSku.name}" → ${nameMatches ? '✅' : '❌'}`);
         console.log(`   Категория: файл="${category}" vs база="${itemWithSameSku.category}" → ${categoryMatches ? '✅' : '❌'}`);
         console.log(`   Место: файл="${location}" vs база="${itemWithSameSku.location}" → ${locationMatches ? '✅' : '❌'}`);
         console.log(`   Единица: файл="${unit}" vs база="${itemWithSameSku.unit}" → ${unitMatches ? '✅' : '❌'}`);
-        
+
         // Если ВСЕ обязательные поля совпадают → это дубликат
         if (nameMatches && categoryMatches && locationMatches && unitMatches) {
           processed.duplicates.push({
@@ -3674,14 +3837,14 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
           console.log(`Дубликат с базой (по артикулу и обязательным полям) для "${name}":`, itemWithSameSku);
           return;
         }
-        
+
         // Собираем список несовпадающих полей для информативного сообщения
         const mismatches = [];
         if (!nameMatches) mismatches.push(`название: "${name}" ≠ "${itemWithSameSku.name}"`);
         if (!categoryMatches) mismatches.push(`категория: "${category}" ≠ "${itemWithSameSku.category}"`);
         if (!locationMatches) mismatches.push(`место: "${location}" ≠ "${itemWithSameSku.location}"`);
         if (!unitMatches) mismatches.push(`единица: "${unit}" ≠ "${itemWithSameSku.unit}"`);
-        
+
         // Если обязательные поля отличаются → ошибка (конфликт артикулов)
         processed.errors.push({
           row: rowNumber,
@@ -3691,7 +3854,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
         return;
       }
     }
-    
+
     // Добавляем валидный товар (только если это НЕ дубликат и нет конфликта артикулов)
     // Сохраняем информацию об извлеченном изображении для последующей загрузки
     const itemData = {
@@ -3700,23 +3863,23 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       unit: unit,
       location: (normalizedRow.location || '').trim() || null,
       // Преобразуем sku в строку или число в зависимости от типа (если это число, сохраняем как число)
-      sku: normalizedRow.sku !== null && normalizedRow.sku !== undefined && normalizedRow.sku !== '' 
-        ? (typeof normalizedRow.sku === 'number' ? normalizedRow.sku : String(normalizedRow.sku).trim()) 
+      sku: normalizedRow.sku !== null && normalizedRow.sku !== undefined && normalizedRow.sku !== ''
+        ? (typeof normalizedRow.sku === 'number' ? normalizedRow.sku : String(normalizedRow.sku).trim())
         : null,
       description: (normalizedRow.description || '').trim() || null,
       image_url: imageUrl, // Сохраняем URL изображения (если есть)
       _extractedImage: normalizedRow._extractedImage // Сохраняем извлеченное изображение для загрузки
     };
-    
+
     // Удаляем служебные поля перед сохранением (они не должны попасть в базу данных)
     // _excelRowNumber используется только для сопоставления изображений
-    
+
     processed.items.push(itemData);
   });
-  
+
   // Загружаем извлеченные изображения в Supabase Storage
   // Это делаем после обработки всех товаров, чтобы не блокировать интерфейс
-  
+
   // Подсчитываем, сколько товаров имеют изображения для загрузки
   const itemsWithImages = processed.items.filter(item => item._extractedImage && item._extractedImage.blob);
   console.log(`📊 Статистика после обработки:`);
@@ -3724,7 +3887,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
   console.log(`   Товаров с изображениями: ${itemsWithImages.length}`);
   console.log(`   Извлечено изображений из Excel: ${extractedImages.size}`);
   console.log(`   Связей в imageRowMap: ${imageRowMap.size}`);
-  
+
   if (itemsWithImages.length === 0 && extractedImages.size > 0) {
     console.error(`❌ ПРОБЛЕМА: Изображения извлечены (${extractedImages.size}), но ни одно не сопоставлено с товарами!`);
     console.error(`   Возможные причины:`);
@@ -3732,14 +3895,14 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
     console.error(`   2. Неправильное сопоставление индексов строк`);
     console.error(`   3. Артикулы не извлекаются из строк`);
   }
-  
+
   if (extractedImages.size > 0 && itemsWithImages.length > 0) {
     console.log(`Начинаем загрузку ${itemsWithImages.length} изображений в Supabase Storage...`);
     await uploadExtractedImages(processed, uploadFileToStorage);
   } else if (extractedImages.size > 0) {
     console.warn(`⚠️ Изображения извлечены, но не будут загружены, так как не сопоставлены с товарами.`);
   }
-  
+
   return processed;
 }
 
@@ -3751,23 +3914,23 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
  */
 async function uploadExtractedImages(processedData, uploadFunction) {
   const bucketName = 'item-images';
-  
+
   console.log(`Начинаем загрузку изображений в bucket "${bucketName}"...`);
-  
+
   // Подсчитываем, сколько товаров имеют изображения
   const itemsWithImages = processedData.items.filter(item => item._extractedImage && item._extractedImage.blob);
   console.log(`📊 Товаров с изображениями: ${itemsWithImages.length} из ${processedData.items.length}`);
-  
+
   if (itemsWithImages.length === 0) {
     console.warn(`⚠️ Нет товаров с изображениями для загрузки!`);
     console.warn(`   Проверьте, что изображения были извлечены из Excel и сопоставлены со строками.`);
     return;
   }
-  
+
   const uploadPromises = [];
   let uploadCount = 0;
   let bucketErrorShown = false; // Флаг, чтобы показать ошибку bucket только один раз
-  
+
   // Обрабатываем товары для импорта
   for (const item of processedData.items) {
     if (item._extractedImage && item._extractedImage.blob) {
@@ -3787,11 +3950,11 @@ async function uploadExtractedImages(processedData, uploadFunction) {
         .catch(error => {
           // Проверяем, связана ли ошибка с bucket
           const isBucketError = error.message && (
-            error.message.includes('Bucket') || 
+            error.message.includes('Bucket') ||
             error.message.includes('bucket') ||
             error.message.includes('не найден')
           );
-          
+
           // Если это ошибка bucket и мы еще не показывали сообщение, показываем его
           if (isBucketError && !bucketErrorShown) {
             bucketErrorShown = true;
@@ -3814,21 +3977,21 @@ async function uploadExtractedImages(processedData, uploadFunction) {
             console.error('═══════════════════════════════════════');
             console.error('');
           }
-          
+
           // Логируем все ошибки для отладки
           if (!isBucketError) {
             console.error(`❌ Ошибка загрузки изображения "${fileName}" для товара "${item.name}":`, error.message || error);
             console.error(`   Имя файла: ${fileName}`);
             console.error(`   Bucket: ${bucketName}`);
           }
-          
+
           // Пробрасываем ошибку дальше, чтобы Promise.allSettled правильно определил статус
           throw error;
         });
       uploadPromises.push(uploadPromise);
     }
   }
-  
+
   // Обрабатываем дубликаты
   for (const duplicate of processedData.duplicates) {
     if (duplicate.data._extractedImage && duplicate.data._extractedImage.blob) {
@@ -3853,7 +4016,7 @@ async function uploadExtractedImages(processedData, uploadFunction) {
             error.message.includes('bucket') && error.message.includes('not found') ||
             error.message.includes('Bucket not found')
           ) && !error.message.includes('already exists') && !error.message.includes('Duplicate');
-          
+
           // Если это ошибка bucket и мы еще не показывали сообщение, показываем его
           if (isBucketError && !bucketErrorShown) {
             bucketErrorShown = true;
@@ -3876,41 +4039,41 @@ async function uploadExtractedImages(processedData, uploadFunction) {
             console.error('═══════════════════════════════════════');
             console.error('');
           }
-          
+
           // Не логируем каждую ошибку bucket отдельно
           if (!isBucketError) {
             console.error(`❌ Ошибка загрузки изображения для дубликата "${duplicate.data.name}":`, error.message || error);
           }
-          
+
           // Пробрасываем ошибку дальше, чтобы Promise.allSettled правильно определил статус
           throw error;
         });
       uploadPromises.push(uploadPromise);
     }
   }
-  
+
   // Ждем завершения всех загрузок
   if (uploadPromises.length > 0) {
     const results = await Promise.allSettled(uploadPromises);
-    
+
     // Подсчитываем успешные и неудачные загрузки
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
-    
+
     console.log(`📊 Загрузка изображений завершена:`);
     console.log(`   ✅ Успешно: ${successful}`);
     console.log(`   ❌ Ошибок: ${failed}`);
-    
+
     if (failed > 0) {
       console.warn(`⚠️ ${failed} изображений не удалось загрузить.`);
       // Проверяем, есть ли другие ошибки (не связанные с bucket, так как мы уже проверили)
-      const otherErrors = results.filter(r => 
-        r.status === 'rejected' && 
-        r.reason && 
-        r.reason.message && 
+      const otherErrors = results.filter(r =>
+        r.status === 'rejected' &&
+        r.reason &&
+        r.reason.message &&
         !r.reason.message.includes('Bucket')
       );
-      
+
       if (otherErrors.length > 0 && otherErrors.length <= 5) {
         // Показываем первые 5 ошибок, если их немного
         console.error('Примеры ошибок:');
@@ -3935,29 +4098,29 @@ function updateImportPreview(data, fileName) {
     ошибок: data.errors.length,
     дубликатов: data.duplicates.length
   });
-  
+
   // Показываем кнопки фильтров
   const filterButtons = document.getElementById('filter-buttons');
   if (filterButtons) {
     filterButtons.classList.remove('hidden');
   }
-  
+
   // Обновляем счетчики в кнопках фильтров
   updateFilterButtons(data);
-  
+
   // Отображаем ошибки, дубликаты и валидные товары
   renderImportPreview(data);
-  
+
   // Обновляем кнопку "Импортировать"
   const importButton = document.getElementById('import-btn');
-  
+
   if (importButton) {
     const totalItems = data.items.length + data.errors.length + data.duplicates.length;
-    
+
     // Если есть ошибки или дубликаты, импортировать нельзя (только 0 из totalItems)
     const hasErrors = data.errors.length > 0;
     const hasDuplicates = data.duplicates.length > 0;
-    
+
     if (hasErrors || hasDuplicates) {
       // Есть проблемы - импорт заблокирован
       importButton.disabled = true;
@@ -3971,7 +4134,7 @@ function updateImportPreview(data, fileName) {
     } else {
       // Нет ошибок и дубликатов - можно импортировать только валидные товары
       const itemsToProcess = data.items.length;
-      
+
       if (itemsToProcess > 0) {
         importButton.disabled = false;
         importButton.removeAttribute('disabled');
@@ -3994,34 +4157,34 @@ function updateImportPreview(data, fileName) {
       }
     }
   }
-  
+
   // Обновляем сообщение об ошибках и дубликатах
   const errorMessage = document.getElementById('error-message');
   const errorMessageText = document.getElementById('error-message-text');
-  
+
   if (errorMessage) {
     const hasErrors = data.errors.length > 0;
     const hasDuplicates = data.duplicates.length > 0;
-    
+
     if (hasErrors || hasDuplicates) {
       let messageParts = [];
-      
+
       if (hasErrors) {
-        const errorText = data.errors.length === 1 
-          ? '1 ошибку' 
+        const errorText = data.errors.length === 1
+          ? '1 ошибку'
           : `${data.errors.length} ${data.errors.length < 5 ? 'ошибки' : 'ошибок'}`;
         messageParts.push(`Исправьте ${errorText}`);
       }
-      
+
       if (hasDuplicates) {
         const duplicateText = data.duplicates.length === 1
           ? '1 дубликат'
           : `${data.duplicates.length} ${data.duplicates.length < 5 ? 'дубликата' : 'дубликатов'}`;
         messageParts.push(`решите ${duplicateText}`);
       }
-      
+
       const message = messageParts.join(' и ') + ' перед сохранением';
-      
+
       if (errorMessageText) {
         errorMessageText.textContent = message;
       }
@@ -4041,10 +4204,10 @@ function createCollapsibleSection(id, title, count, type, duplicates = null) {
   const section = document.createElement('div');
   section.className = 'collapsible-section';
   section.setAttribute('data-section-id', id);
-  
+
   // Определяем, свернута ли секция по умолчанию (для длинных списков)
   const isCollapsed = count > 5;
-  
+
   // Иконка для типа секции
   let icon = 'expand_more';
   let iconColor = 'text-slate-500';
@@ -4058,7 +4221,7 @@ function createCollapsibleSection(id, title, count, type, duplicates = null) {
     icon = 'check_circle';
     iconColor = 'text-green-500';
   }
-  
+
   // Кнопки массовых действий для дубликатов
   let bulkActions = '';
   if (type === 'duplicate' && duplicates && duplicates.length > 0) {
@@ -4073,7 +4236,7 @@ function createCollapsibleSection(id, title, count, type, duplicates = null) {
       </div>
     `;
   }
-  
+
   // Кнопка массового удаления для ошибок
   if (type === 'error' && count > 0) {
     bulkActions = `
@@ -4084,12 +4247,12 @@ function createCollapsibleSection(id, title, count, type, duplicates = null) {
       </div>
     `;
   }
-  
+
   // Если секция должна быть свернута по умолчанию, не добавляем класс expanded
   if (!isCollapsed) {
     section.classList.add('expanded');
   }
-  
+
   section.innerHTML = `
     <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
       <button class="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors section-toggle-btn" data-section="${id}">
@@ -4108,21 +4271,21 @@ function createCollapsibleSection(id, title, count, type, duplicates = null) {
       </div>
     </div>
   `;
-  
+
   // Обработчик сворачивания/разворачивания
   const toggleBtn = section.querySelector('.section-toggle-btn');
   const content = section.querySelector('.section-content');
   const arrow = section.querySelector('.chevron-icon');
   const itemsContainer = section.querySelector('.section-items');
-  
+
   toggleBtn.addEventListener('click', () => {
     // Переключаем класс expanded на самой секции
     section.classList.toggle('expanded');
   });
-  
+
   // Перемещаем элементы в контейнер items
   // Это будет сделано позже, когда элементы будут добавлены
-  
+
   return section;
 }
 
@@ -4131,16 +4294,16 @@ function createCollapsibleSection(id, title, count, type, duplicates = null) {
  */
 function updateFilterButtons(data) {
   const totalCount = data.items.length + data.errors.length + data.duplicates.length;
-  
+
   // Обновляем счетчики по ID
   const countAll = document.getElementById('count-all');
   const countErrors = document.getElementById('count-errors');
   const countDuplicates = document.getElementById('count-duplicates');
-  
+
   if (countAll) countAll.textContent = totalCount;
   if (countErrors) countErrors.textContent = data.errors.length;
   if (countDuplicates) countDuplicates.textContent = data.duplicates.length;
-  
+
   // Добавляем обработчики кликов на кнопки фильтров
   setupFilterButtons();
 }
@@ -4153,25 +4316,25 @@ function setupFilterButtons() {
   if (window.filterButtonsSetup) {
     return;
   }
-  
+
   // Находим кнопки фильтров
   const allButtons = Array.from(document.querySelectorAll('button'));
-  
+
   const allButton = allButtons.find(btn => {
     const text = btn.textContent.trim().toLowerCase();
     return text.startsWith('все') && !btn.hasAttribute('data-filter-handler');
   });
-  
+
   const errorsButton = allButtons.find(btn => {
     const text = btn.textContent.trim().toLowerCase();
     return text.startsWith('ошибки') && !btn.hasAttribute('data-filter-handler');
   });
-  
+
   const duplicatesButton = allButtons.find(btn => {
     const text = btn.textContent.trim().toLowerCase();
     return text.startsWith('дубликаты') && !btn.hasAttribute('data-filter-handler');
   });
-  
+
   // Добавляем обработчики
   if (allButton) {
     allButton.setAttribute('data-filter-handler', 'true');
@@ -4184,7 +4347,7 @@ function setupFilterButtons() {
       updateActiveFilterButton('all', allButton, errorsButton, duplicatesButton);
     });
   }
-  
+
   if (errorsButton) {
     errorsButton.setAttribute('data-filter-handler', 'true');
     errorsButton.addEventListener('click', () => {
@@ -4196,7 +4359,7 @@ function setupFilterButtons() {
       updateActiveFilterButton('errors', allButton, errorsButton, duplicatesButton);
     });
   }
-  
+
   if (duplicatesButton) {
     duplicatesButton.setAttribute('data-filter-handler', 'true');
     duplicatesButton.addEventListener('click', () => {
@@ -4208,7 +4371,7 @@ function setupFilterButtons() {
       updateActiveFilterButton('duplicates', allButton, errorsButton, duplicatesButton);
     });
   }
-  
+
   window.filterButtonsSetup = true;
 }
 
@@ -4225,7 +4388,7 @@ function updateActiveFilterButton(activeFilter, allBtn, errorsBtn, duplicatesBtn
       allBtn.className = 'shrink-0 h-9 px-4 bg-white dark:bg-surface-dark text-slate-600 dark:text-slate-300 rounded-full text-xs font-bold shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95 transition-all flex items-center gap-2';
     }
   }
-  
+
   if (errorsBtn) {
     // Кнопка "Ошибки" - активное состояние
     if (activeFilter === 'errors') {
@@ -4234,7 +4397,7 @@ function updateActiveFilterButton(activeFilter, allBtn, errorsBtn, duplicatesBtn
       errorsBtn.className = 'shrink-0 h-9 px-4 bg-white dark:bg-surface-dark text-red-600 dark:text-red-400 rounded-full text-xs font-bold shadow-sm border border-red-100 dark:border-red-900/30 active:bg-red-50 dark:active:bg-red-900/20 transition-colors flex items-center gap-2';
     }
   }
-  
+
   if (duplicatesBtn) {
     // Кнопка "Дубликаты" - активное состояние
     if (activeFilter === 'duplicates') {
@@ -4252,23 +4415,23 @@ async function handleBulkRemoveErrors(errors) {
   if (!errors || errors.length === 0) {
     return;
   }
-  
-  const confirmed = window.confirm(
+
+  const confirmed = await showDangerConfirm(
     `Вы уверены, что хотите удалить все ${errors.length} ошибок?`
   );
-  
+
   if (!confirmed) {
     return;
   }
-  
+
   try {
     // Удаляем все ошибки из данных
     importedData.errors = [];
-    
+
     // Обновляем предпросмотр
     updateImportPreview(importedData);
     renderImportPreview(importedData);
-    
+
     showSuccess(`Удалено ${errors.length} ошибок`);
   } catch (error) {
     console.error('Ошибка при массовом удалении:', error);
@@ -4283,15 +4446,15 @@ async function handleBulkKeepOld(duplicates) {
   if (!duplicates || duplicates.length === 0) {
     return;
   }
-  
-  const confirmed = window.confirm(
+
+  const confirmed = await showConfirm(
     `Вы уверены, что хотите оставить старое для всех ${duplicates.length} дубликатов?`
   );
-  
+
   if (!confirmed) {
     return;
   }
-  
+
   try {
     // Заменяем каждый блок дубликата на блок с пометкой "Пропущен"
     duplicates.forEach(duplicate => {
@@ -4307,18 +4470,18 @@ async function handleBulkKeepOld(duplicates) {
         }
       }
     });
-    
+
     // Удаляем все дубликаты из списка (оставляем старое)
-    importedData.duplicates = importedData.duplicates.filter(d => 
+    importedData.duplicates = importedData.duplicates.filter(d =>
       !duplicates.some(dup => dup.row === d.row)
     );
-    
+
     // Обновляем счетчики
     updateFilterButtons(importedData);
-    
+
     // Обновляем кнопку импорта и предпросмотр
     updateImportPreview(importedData);
-    
+
     showSuccess(`Оставлено старое для ${duplicates.length} дубликатов`);
   } catch (error) {
     console.error('Ошибка при массовом действии "оставить старое":', error);
@@ -4333,28 +4496,28 @@ async function handleBulkUpdate(duplicates) {
   if (!duplicates || duplicates.length === 0) {
     return;
   }
-  
-  const confirmed = window.confirm(
+
+  const confirmed = await showConfirm(
     `Вы уверены, что хотите обновить все ${duplicates.length} дубликатов данными из файла?`
   );
-  
+
   if (!confirmed) {
     return;
   }
-  
+
   try {
     showSuccess('Обновление начато...');
-    
+
     let updated = 0;
     let updatedLocal = 0;
     let failed = 0;
-    
+
     // Обновляем каждый дубликат
     for (const duplicate of duplicates) {
       try {
         // Подготавливаем данные для обновления
         let imageUrl = duplicate.data.image_url || null;
-        
+
         // Если image_url не найден, проверяем photo (на случай старого формата данных)
         if (!imageUrl && duplicate.data.photo) {
           const photoValue = String(duplicate.data.photo).trim();
@@ -4362,7 +4525,7 @@ async function handleBulkUpdate(duplicates) {
             imageUrl = photoValue;
           }
         }
-        
+
         const updateData = {
           name: duplicate.data.name,
           category: duplicate.data.category || null,
@@ -4372,19 +4535,19 @@ async function handleBulkUpdate(duplicates) {
           description: duplicate.data.description || null,
           image_url: imageUrl
         };
-        
+
         const result = await items.updateItem(duplicate.existing.id, updateData);
-        
+
         // Проверяем, синхронизирован ли товар с сервером
         const isSynced = result && result.synced === true;
         const status = isSynced ? 'updated' : 'updated-local';
-        
+
         if (isSynced) {
           updated++;
         } else {
           updatedLocal++;
         }
-        
+
         // Заменяем блок дубликата на блок с пометкой
         const duplicateElement = document.querySelector(`[data-duplicate-row="${duplicate.row}"]`);
         if (duplicateElement) {
@@ -4397,10 +4560,10 @@ async function handleBulkUpdate(duplicates) {
             parentContainer.replaceChild(processedElement, duplicateElement);
           }
         }
-        
+
         // Удаляем дубликат из списка
         importedData.duplicates = importedData.duplicates.filter(d => d.row !== duplicate.row);
-        
+
         if ((updated + updatedLocal) % 10 === 0) {
           console.log(`Обработано ${updated + updatedLocal} из ${duplicates.length} дубликатов...`);
         }
@@ -4409,13 +4572,13 @@ async function handleBulkUpdate(duplicates) {
         failed++;
       }
     }
-    
+
     // Обновляем счетчики
     updateFilterButtons(importedData);
-    
+
     // Обновляем кнопку импорта и предпросмотр
     updateImportPreview(importedData);
-    
+
     // Формируем итоговое сообщение
     let message = `Обновление завершено! `;
     if (updated > 0) {
@@ -4427,7 +4590,7 @@ async function handleBulkUpdate(duplicates) {
     if (failed > 0) {
       message += `Ошибок: ${failed}.`;
     }
-    
+
     if (updatedLocal > 0) {
       showSuccess(message);
       console.warn(`⚠️ ${updatedLocal} товаров обновлены локально, но не синхронизированы с сервером. Они будут синхронизированы позже автоматически.`);
@@ -4449,22 +4612,22 @@ function renderImportPreview(data) {
     console.error('Контейнер для предпросмотра не найден');
     return;
   }
-  
+
   // Очищаем контейнер (кроме фильтров)
   container.innerHTML = '';
-  
+
   // Получаем текущий активный фильтр
   const activeFilter = window.currentImportFilter || 'all';
-  
+
   // Отображаем ошибки (если активен фильтр "all" или "errors")
   if (data.errors.length > 0 && (activeFilter === 'all' || activeFilter === 'errors')) {
     const errorsSection = createCollapsibleSection('errors', 'Ошибки', data.errors.length, 'error');
     const errorsItemsContainer = errorsSection.querySelector('.section-items');
-    
+
     data.errors.forEach(error => {
       errorsItemsContainer.appendChild(createErrorElement(error));
     });
-    
+
     // Добавляем обработчик для массового удаления ошибок
     const bulkRemoveBtn = errorsSection.querySelector('.bulk-remove-errors-btn');
     if (bulkRemoveBtn) {
@@ -4472,47 +4635,47 @@ function renderImportPreview(data) {
         handleBulkRemoveErrors(data.errors);
       });
     }
-    
+
     container.appendChild(errorsSection);
   }
-  
+
   // Отображаем дубликаты (если активен фильтр "all" или "duplicates")
   if (data.duplicates.length > 0 && (activeFilter === 'all' || activeFilter === 'duplicates')) {
     const duplicatesSection = createCollapsibleSection('duplicates', 'Дубликаты', data.duplicates.length, 'duplicate', data.duplicates);
     const duplicatesItemsContainer = duplicatesSection.querySelector('.section-items');
-    
+
     data.duplicates.forEach(duplicate => {
       duplicatesItemsContainer.appendChild(createDuplicateElement(duplicate));
     });
-    
+
     // Добавляем обработчики для массовых действий
     const bulkKeepOldBtn = duplicatesSection.querySelector('.bulk-keep-old-btn');
     const bulkUpdateBtn = duplicatesSection.querySelector('.bulk-update-btn');
-    
+
     if (bulkKeepOldBtn) {
       bulkKeepOldBtn.addEventListener('click', async () => {
         await handleBulkKeepOld(data.duplicates);
       });
     }
-    
+
     if (bulkUpdateBtn) {
       bulkUpdateBtn.addEventListener('click', async () => {
         await handleBulkUpdate(data.duplicates);
       });
     }
-    
+
     container.appendChild(duplicatesSection);
   }
-  
+
   // Отображаем валидные товары (если активен фильтр "all" или "items")
   if (data.items.length > 0 && (activeFilter === 'all' || activeFilter === 'items')) {
     const itemsSection = createCollapsibleSection('items', 'Валидные товары', data.items.length, 'item');
     const itemsItemsContainer = itemsSection.querySelector('.section-items');
-    
+
     data.items.forEach((item, index) => {
       itemsItemsContainer.appendChild(createValidItemElement(item));
     });
-    
+
     container.appendChild(itemsSection);
   }
 }
@@ -4524,13 +4687,13 @@ function updateFieldValidation(container, fieldName) {
   const VALID_CATEGORIES = ['посуда', 'бокалы', 'приборы', 'инвентарь', 'расходники', 'прочее'];
   const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
   const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
-  
+
   const field = container.querySelector(`[data-field="${fieldName}"]`);
   if (!field) return;
-  
+
   let isValid = false;
   let icon = field.parentElement.querySelector('.material-symbols-outlined');
-  
+
   if (fieldName === 'name') {
     isValid = field.value.trim() !== '';
   } else if (fieldName === 'sku') {
@@ -4555,7 +4718,7 @@ function updateFieldValidation(container, fieldName) {
   } else if (fieldName === 'unit') {
     isValid = VALID_UNITS.includes(field.value);
   }
-  
+
   // Обновляем классы поля
   field.classList.remove('border-red-300', 'border-red-700', 'border-green-500', 'border-green-600', 'dark:border-red-700', 'dark:border-green-600');
   if (isValid) {
@@ -4563,7 +4726,7 @@ function updateFieldValidation(container, fieldName) {
   } else {
     field.classList.add('border-red-300', 'dark:border-red-700');
   }
-  
+
   // Обновляем иконку
   if (icon && (fieldName === 'sku' || fieldName === 'unit')) {
     icon.textContent = isValid ? 'check_circle' : 'warning';
@@ -4579,43 +4742,43 @@ function createErrorElement(error) {
   const div = document.createElement('div');
   div.className = 'bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-red-200 dark:border-red-800/50 relative';
   div.setAttribute('data-error-row', error.row);
-  
+
   const errorType = error.message || 'Нет данных';
-  
+
   // Константы для выпадающих списков
   const VALID_CATEGORIES = ['посуда', 'бокалы', 'приборы', 'инвентарь', 'расходники', 'прочее'];
   const VALID_LOCATIONS = ['бар', 'кухня', 'склад'];
   const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
-  
+
   // Проверяем, выбрано ли "другое" для места хранения
   const isCustomLocation = error.data.location && !VALID_LOCATIONS.includes(error.data.location.toLowerCase());
   const customLocationValue = isCustomLocation ? error.data.location : '';
-  
+
   // Формируем опции для категорий
   const categoryOptions = VALID_CATEGORIES.map(cat => {
     const selected = error.data.category && error.data.category.toLowerCase() === cat.toLowerCase() ? 'selected' : '';
     return `<option value="${cat}" ${selected}>${cat}</option>`;
   }).join('');
-  
+
   // Формируем опции для мест хранения
   const locationOptions = VALID_LOCATIONS.map(loc => {
     const selected = error.data.location && error.data.location.toLowerCase() === loc.toLowerCase() ? 'selected' : '';
     return `<option value="${loc}" ${selected}>${loc}</option>`;
   }).join('');
-  
+
   // Формируем опции для единиц измерения
   const unitOptions = VALID_UNITS.map(unit => {
     const selected = error.data.unit === unit ? 'selected' : '';
     return `<option value="${unit}" ${selected}>${unit}</option>`;
   }).join('');
-  
+
   // Определяем валидность полей
   const nameValid = error.data.name && error.data.name.trim() !== '';
   const skuValid = error.data.sku && error.data.sku.trim() !== '';
   const categoryValid = error.data.category && VALID_CATEGORIES.includes(error.data.category.toLowerCase());
   const locationValid = error.data.location && (VALID_LOCATIONS.includes(error.data.location.toLowerCase()) || isCustomLocation);
   const unitValid = error.data.unit && VALID_UNITS.includes(error.data.unit);
-  
+
   div.innerHTML = `
     <div class="mb-4">
       <div class="flex items-center gap-2 mb-2">
@@ -4764,7 +4927,7 @@ function createErrorElement(error) {
       <button class="text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors fix-error-btn" data-row="${error.row}">Исправить</button>
     </div>
   `;
-  
+
   // Обработчики для разворачивания подсказок
   const hintToggles = div.querySelectorAll('.hint-toggle-btn');
   hintToggles.forEach(toggle => {
@@ -4776,16 +4939,16 @@ function createErrorElement(error) {
       }
     });
   });
-  
+
   // Обработчики для изменения цвета полей при валидности
   const errorFields = div.querySelectorAll('.error-field');
   errorFields.forEach(field => {
     const fieldName = field.getAttribute('data-field');
-    
+
     // Для select и input
     field.addEventListener('change', () => updateFieldValidation(div, fieldName));
     field.addEventListener('input', () => updateFieldValidation(div, fieldName));
-    
+
     // Для места хранения - обработка выбора "другое"
     if (fieldName === 'location') {
       field.addEventListener('change', () => {
@@ -4793,7 +4956,7 @@ function createErrorElement(error) {
         const locationValue = locationSelect.value;
         const locationContainer = locationSelect.closest('div');
         let customInput = locationContainer.querySelector('input[data-field="location-custom"]');
-        
+
         if (locationValue === 'другое') {
           if (!customInput) {
             customInput = document.createElement('input');
@@ -4802,7 +4965,7 @@ function createErrorElement(error) {
             customInput.type = 'text';
             customInput.setAttribute('data-field', 'location-custom');
             locationContainer.appendChild(customInput);
-            
+
             customInput.addEventListener('input', () => updateFieldValidation(div, 'location'));
           }
           customInput.style.display = 'block';
@@ -4816,7 +4979,7 @@ function createErrorElement(error) {
       });
     }
   });
-  
+
   // Обработчик кнопки удаления
   const removeBtn = div.querySelector('.remove-error-btn');
   if (removeBtn) {
@@ -4828,20 +4991,20 @@ function createErrorElement(error) {
       renderImportPreview(importedData);
     });
   }
-  
+
   // Обработчики для загрузки фото
   const imageBtn = div.querySelector(`.error-image-btn[data-row="${error.row}"]`);
   const imageInput = div.querySelector(`.error-image-input[data-row="${error.row}"]`);
   const imagePreview = div.querySelector(`.error-image-preview[data-row="${error.row}"]`);
   const imagePreviewImg = div.querySelector(`.error-image-preview-img[data-row="${error.row}"]`);
   const imageRemoveBtn = div.querySelector(`.error-image-remove-btn[data-row="${error.row}"]`);
-  
+
   if (imageBtn && imageInput) {
     imageBtn.addEventListener('click', () => {
       imageInput.click();
     });
   }
-  
+
   if (imageInput) {
     imageInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -4862,7 +5025,7 @@ function createErrorElement(error) {
       }
     });
   }
-  
+
   if (imageRemoveBtn) {
     imageRemoveBtn.addEventListener('click', () => {
       if (imageInput) imageInput.value = '';
@@ -4871,7 +5034,7 @@ function createErrorElement(error) {
       if (imagePreviewImg) imagePreviewImg.src = '';
     });
   }
-  
+
   // Обработчик кнопки исправления
   const fixBtn = div.querySelector('.fix-error-btn');
   if (fixBtn) {
@@ -4886,7 +5049,7 @@ function createErrorElement(error) {
       const descriptionInput = div.querySelector('input[placeholder*="Описание"]');
       const locationCustomInput = div.querySelector('input[data-field="location-custom"]');
       const errorImageInput = div.querySelector(`.error-image-input[data-row="${error.row}"]`);
-      
+
       const name = (nameInput?.value || '').trim();
       const sku = (skuInput?.value || '').trim();
       const category = categorySelect?.value || '';
@@ -4897,61 +5060,61 @@ function createErrorElement(error) {
       }
       const unit = unitSelect?.value || '';
       const description = (descriptionInput?.value || '').trim();
-      
+
       // Проверяем валидность
       if (!name) {
         showError('Введите название товара');
         nameInput?.focus();
         return;
       }
-      
+
       if (!sku) {
         showError('Введите артикул. Артикул обязателен и должен быть уникальным');
         skuInput?.focus();
         return;
       }
-      
+
       // Проверка обязательных полей
       if (!category) {
         showError('Выберите категорию');
         categorySelect?.focus();
         return;
       }
-      
+
       if (!location) {
         showError('Выберите место хранения или введите свой вариант');
         locationSelect?.focus();
         return;
       }
-      
+
       if (!unit) {
         showError('Выберите единицу измерения');
         unitSelect?.focus();
         return;
       }
-      
+
       // Проверяем артикул на совпадение с базой
       const existingItems = await items.getAllItems();
       const skuLower = sku.toLowerCase().trim();
-      
+
       // Ищем товар с таким же артикулом в базе
       const itemWithSameSku = existingItems.find(item => {
         const itemSku = item.sku ? item.sku.toString().toLowerCase().trim() : '';
         return itemSku !== '' && itemSku === skuLower;
       });
-      
+
       if (itemWithSameSku) {
         // Проверяем совпадают ли все обязательные поля
         const itemName = (itemWithSameSku.name || '').toLowerCase().trim();
         const itemCategory = (itemWithSameSku.category || '').toLowerCase().trim();
         const itemLocation = (itemWithSameSku.location || '').toLowerCase().trim();
         const itemUnit = (itemWithSameSku.unit || '').toLowerCase().trim();
-        
+
         const nameMatches = itemName === name.toLowerCase().trim();
         const categoryMatches = itemCategory === category.toLowerCase().trim();
         const locationMatches = itemLocation === location.toLowerCase().trim();
         const unitMatches = itemUnit === unit.toLowerCase().trim();
-        
+
         // Если ВСЕ обязательные поля совпадают → переводим в дубликаты
         if (nameMatches && categoryMatches && locationMatches && unitMatches) {
           // Создаём данные дубликата
@@ -4970,52 +5133,52 @@ function createErrorElement(error) {
             existing: itemWithSameSku,
             duplicateType: 'database'
           };
-          
+
           // Добавляем в дубликаты
           importedData.duplicates.push(duplicateData);
-          
+
           // Удаляем из ошибок
           importedData.errors = importedData.errors.filter(e => e.row !== error.row);
-          
+
           // Обновляем UI
           updateFilterButtons(importedData);
           updateImportPreview(importedData);
           renderImportPreview(importedData);
-          
+
           showError(`Товар перенесён в дубликаты (совпадает с "${itemWithSameSku.name}")`);
           return;
         }
-        
+
         // Если обязательные поля отличаются → показываем конкретные отличия
         const mismatches = [];
         if (!nameMatches) mismatches.push(`название: "${name}" ≠ "${itemWithSameSku.name}"`);
         if (!categoryMatches) mismatches.push(`категория: "${category}" ≠ "${itemWithSameSku.category}"`);
         if (!locationMatches) mismatches.push(`место: "${location}" ≠ "${itemWithSameSku.location}"`);
         if (!unitMatches) mismatches.push(`единица: "${unit}" ≠ "${itemWithSameSku.unit}"`);
-        
+
         showError(`Артикул "${sku}" уже в базе. Отличия: ${mismatches.join('; ')}`);
         skuInput?.focus();
         return;
       }
-      
+
       // Проверяем уникальность артикула среди уже добавленных товаров для импорта
       const importedSkuItem = importedData.items.find(item => {
         const itemSku = item.sku ? item.sku.toString().toLowerCase().trim() : '';
         return itemSku === skuLower;
       });
-      
+
       if (importedSkuItem) {
         // Проверяем совпадают ли обязательные поля
         const itemName = (importedSkuItem.name || '').toLowerCase().trim();
         const itemCategory = (importedSkuItem.category || '').toLowerCase().trim();
         const itemLocation = (importedSkuItem.location || '').toLowerCase().trim();
         const itemUnit = (importedSkuItem.unit || '').toLowerCase().trim();
-        
+
         const nameMatches = itemName === name.toLowerCase().trim();
         const categoryMatches = itemCategory === category.toLowerCase().trim();
         const locationMatches = itemLocation === location.toLowerCase().trim();
         const unitMatches = itemUnit === unit.toLowerCase().trim();
-        
+
         if (nameMatches && categoryMatches && locationMatches && unitMatches) {
           // Переводим в дубликаты (дубликат внутри файла)
           const duplicateData = {
@@ -5033,33 +5196,33 @@ function createErrorElement(error) {
             existing: importedSkuItem,
             duplicateType: 'file'
           };
-          
+
           importedData.duplicates.push(duplicateData);
           importedData.errors = importedData.errors.filter(e => e.row !== error.row);
-          
+
           updateFilterButtons(importedData);
           updateImportPreview(importedData);
           renderImportPreview(importedData);
-          
+
           showError(`Товар перенесён в дубликаты (совпадает с "${importedSkuItem.name}" в файле)`);
           return;
         }
-        
+
         // Отличия есть → ошибка
         const mismatches = [];
         if (!nameMatches) mismatches.push(`название`);
         if (!categoryMatches) mismatches.push(`категория`);
         if (!locationMatches) mismatches.push(`место`);
         if (!unitMatches) mismatches.push(`единица`);
-        
+
         showError(`Артикул "${sku}" уже есть в файле. Отличия: ${mismatches.join(', ')}`);
         skuInput?.focus();
         return;
       }
-      
+
       // Загружаем изображение, если выбрано новое
       let imageUrl = error.data.image_url || error.data._extractedImage || null;
-      
+
       if (errorImageInput && errorImageInput.files && errorImageInput.files.length > 0) {
         try {
           const file = errorImageInput.files[0];
@@ -5073,7 +5236,7 @@ function createErrorElement(error) {
           return;
         }
       }
-      
+
       // Создаем валидный товар из исправленной ошибки
       const fixedItem = {
         name: name,
@@ -5084,26 +5247,26 @@ function createErrorElement(error) {
         description: description || null,
         image_url: imageUrl
       };
-      
+
       // Добавляем в список валидных товаров
       importedData.items.push(fixedItem);
-      
+
       // Удаляем из списка ошибок
       importedData.errors = importedData.errors.filter(e => e.row !== error.row);
-      
+
       // Удаляем элемент ошибки из DOM
       div.remove();
-      
+
       // Обновляем предпросмотр (чтобы обновить счетчики и кнопку импорта)
       updateImportPreview(importedData);
-      
+
       // Перерисовываем предпросмотр, чтобы показать исправленный товар в списке валидных
       renderImportPreview(importedData);
-      
+
       showSuccess(`Ошибка исправлена. Товар "${name}" готов к импорту`);
     });
   }
-  
+
   return div;
 }
 
@@ -5114,13 +5277,13 @@ function createDuplicateElement(duplicate) {
   const div = document.createElement('div');
   div.className = 'bg-amber-50 dark:bg-amber-900/10 rounded-3xl p-4 shadow-sm border border-amber-200 dark:border-amber-800/50 relative';
   div.setAttribute('data-duplicate-row', duplicate.row);
-  
+
   const itemName = duplicate.data.name || 'Без названия';
   const fileCategory = duplicate.data.category || '—';
   const fileUnit = duplicate.data.unit || '—';
   const dbCategory = duplicate.existing?.category || '—';
   const dbUnit = duplicate.existing?.unit || '—';
-  
+
   div.innerHTML = `
     <div class="flex gap-4">
       <div class="size-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
@@ -5150,7 +5313,7 @@ function createDuplicateElement(duplicate) {
       </button>
     </div>
   `;
-  
+
   // Обработчики кнопок
   const keepOldBtn = div.querySelector('.keep-old-btn');
   const updateBtn = div.querySelector('.update-btn');
@@ -5158,7 +5321,7 @@ function createDuplicateElement(duplicate) {
     keepOldBtn.addEventListener('click', async () => {
       // Заменяем блок дубликата на блок с пометкой "Пропущен"
       const processedElement = createProcessedDuplicateElement(duplicate, 'skipped');
-      
+
       // Находим родительский контейнер (может быть .section-items или прямой родитель)
       let parentContainer = div.parentElement;
       // Если родитель - это .section-items, используем его, иначе ищем выше
@@ -5167,20 +5330,20 @@ function createDuplicateElement(duplicate) {
       } else if (parentContainer) {
         parentContainer.replaceChild(processedElement, div);
       }
-      
+
       // Удаляем дубликат из списка (оставляем старое)
       importedData.duplicates = importedData.duplicates.filter(d => d.row !== duplicate.row);
-      
+
       // Обновляем счетчики
       updateFilterButtons(importedData);
-      
+
       // Обновляем кнопку импорта и предпросмотр
       updateImportPreview(importedData);
-      
+
       showSuccess(`Товар "${duplicate.data.name}" пропущен (оставлено старое)`);
     });
   }
-  
+
   if (updateBtn) {
     updateBtn.addEventListener('click', async () => {
       // Обновляем существующий товар данными из файла
@@ -5188,7 +5351,7 @@ function createDuplicateElement(duplicate) {
         // Подготавливаем данные для обновления
         // image_url уже обработан в processImportedData и сохранен в duplicate.data.image_url
         let imageUrl = duplicate.data.image_url || null;
-        
+
         // Если image_url не найден, проверяем photo (на случай старого формата данных)
         if (!imageUrl && duplicate.data.photo) {
           const photoValue = String(duplicate.data.photo).trim();
@@ -5196,9 +5359,9 @@ function createDuplicateElement(duplicate) {
             imageUrl = photoValue;
           }
         }
-        
+
         console.log(`Обновление дубликата "${duplicate.data.name}": image_url =`, imageUrl);
-        
+
         const updateData = {
           name: duplicate.data.name,
           category: duplicate.data.category || null,
@@ -5208,16 +5371,16 @@ function createDuplicateElement(duplicate) {
           description: duplicate.data.description || null,
           image_url: imageUrl
         };
-        
+
         const result = await items.updateItem(duplicate.existing.id, updateData);
-        
+
         // Проверяем, синхронизирован ли товар с сервером
         const isSynced = result && result.synced === true;
         const status = isSynced ? 'updated' : 'updated-local';
-        
+
         // Заменяем блок дубликата на блок с пометкой
         const processedElement = createProcessedDuplicateElement(duplicate, status);
-        
+
         // Находим родительский контейнер (может быть .section-items или прямой родитель)
         let parentContainer = div.parentElement;
         // Если родитель - это .section-items, используем его, иначе ищем выше
@@ -5226,16 +5389,16 @@ function createDuplicateElement(duplicate) {
         } else if (parentContainer) {
           parentContainer.replaceChild(processedElement, div);
         }
-        
+
         // Удаляем дубликат из списка
         importedData.duplicates = importedData.duplicates.filter(d => d.row !== duplicate.row);
-        
+
         // Обновляем счетчики
         updateFilterButtons(importedData);
-        
+
         // Обновляем кнопку импорта и предпросмотр
         updateImportPreview(importedData);
-        
+
         if (isSynced) {
           showSuccess(`Товар "${duplicate.data.name}" обновлен`);
         } else {
@@ -5247,7 +5410,7 @@ function createDuplicateElement(duplicate) {
       }
     });
   }
-  
+
   return div;
 }
 
@@ -5257,7 +5420,7 @@ function createDuplicateElement(duplicate) {
 function createValidItemElement(item) {
   const div = document.createElement('div');
   div.className = 'bg-white dark:bg-surface-dark rounded-3xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-slate-100 dark:border-slate-800 flex items-center gap-4 group';
-  
+
   div.innerHTML = `
     <div class="size-12 rounded-xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0 transition-colors group-hover:bg-green-100 dark:group-hover:bg-green-900/30">
       <span class="material-symbols-outlined">check_circle</span>
@@ -5269,7 +5432,7 @@ function createValidItemElement(item) {
       <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">${item.unit || 'шт'} ${item.category ? '• ' + item.category : ''}</p>
     </div>
   `;
-  
+
   return div;
 }
 
@@ -5281,11 +5444,11 @@ function createProcessedDuplicateElement(duplicate, status) {
   const div = document.createElement('div');
   div.className = 'bg-white dark:bg-surface-dark rounded-3xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-slate-100 dark:border-slate-800 flex items-center gap-4 group';
   div.setAttribute('data-processed-row', duplicate.row);
-  
+
   const itemName = duplicate.data.name || 'Без названия';
   const unit = duplicate.data.unit || 'шт';
   const category = duplicate.data.category || '';
-  
+
   let statusText, statusColor;
   if (status === 'updated') {
     statusText = 'Файл обновлен';
@@ -5297,12 +5460,12 @@ function createProcessedDuplicateElement(duplicate, status) {
     statusText = 'Пропущен';
     statusColor = 'text-slate-500 dark:text-slate-400';
   }
-  
+
   // Форматируем строку с единицей и категорией (как на скриншоте: "2 кг • Мешок")
-  const unitCategoryText = category 
-    ? `${unit} • ${category}` 
+  const unitCategoryText = category
+    ? `${unit} • ${category}`
     : unit;
-  
+
   div.innerHTML = `
     <div class="size-12 rounded-xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0 transition-colors group-hover:bg-green-100 dark:group-hover:bg-green-900/30">
       <span class="material-symbols-outlined">check_circle</span>
@@ -5318,7 +5481,7 @@ function createProcessedDuplicateElement(duplicate, status) {
       <p class="text-xs ${statusColor} font-medium mt-1">${statusText}</p>
     </div>
   `;
-  
+
   return div;
 }
 
@@ -5327,23 +5490,23 @@ function createProcessedDuplicateElement(duplicate, status) {
  */
 async function handleImport() {
   console.log('handleImport вызвана. Данные:', importedData);
-  
+
   // Проверяем, есть ли данные для импорта (новые товары или дубликаты с изображениями)
-  const duplicatesWithImages = importedData.duplicates?.filter(dup => 
+  const duplicatesWithImages = importedData.duplicates?.filter(dup =>
     dup.data.image_url || dup.data._extractedImage
   ) || [];
-  
+
   if (!importedData || (importedData.items.length === 0 && duplicatesWithImages.length === 0)) {
     console.error('Нет данных для импорта!', importedData);
     showError('Нет данных для импорта. Сначала загрузите файл.');
     return;
   }
-  
+
   console.log(`Начинаем импорт ${importedData.items.length} товаров...`);
-  
+
   // Проверяем, есть ли ошибки
   if (importedData.errors.length > 0) {
-    const confirm = window.confirm(
+    const confirm = await showConfirm(
       `Обнаружено ${importedData.errors.length} ошибок. ` +
       `Импортировать только валидные товары (${importedData.items.length})?`
     );
@@ -5352,18 +5515,18 @@ async function handleImport() {
       return;
     }
   }
-  
+
   // Показываем модальное окно прогресса
   showImportProgressModal('Импорт данных...', 'Подготовка к импорту');
-  
+
   try {
     console.log('Импорт начат. Всего товаров:', importedData.items.length);
-    
+
     let imported = 0;
     let failed = 0;
     const totalItems = importedData.items.length + duplicatesWithImages.length;
     let processedCount = 0;
-    
+
     // Импортируем каждый товар
     for (let i = 0; i < importedData.items.length; i++) {
       const itemData = importedData.items[i];
@@ -5375,29 +5538,29 @@ async function handleImport() {
         await items.createItem(itemData);
         imported++;
         processedCount++;
-        
+
         // Обновляем прогресс
         const percent = Math.round((processedCount / totalItems) * 100);
         updateImportProgress(percent, `Импортировано ${processedCount} из ${totalItems}`);
-        
+
       } catch (error) {
         console.error(`Ошибка импорта товара "${itemData.name}":`, error);
         failed++;
         processedCount++;
       }
     }
-    
+
     // Обрабатываем дубликаты с изображениями
     let updatedCount = 0;
-    
+
     if (duplicatesWithImages.length > 0) {
       console.log(`Обновляем ${duplicatesWithImages.length} существующих товаров с новыми изображениями...`);
-      
+
       for (const duplicate of duplicatesWithImages) {
         try {
           const existingItem = duplicate.existing;
           const newImageUrl = duplicate.data.image_url;
-          
+
           if (newImageUrl && newImageUrl !== existingItem.image_url) {
             console.log(`Обновление изображения для "${existingItem.name}": ${newImageUrl}`);
             await items.updateItem(existingItem.id, {
@@ -5408,11 +5571,11 @@ async function handleImport() {
             console.log(`✅ Изображение обновлено для "${existingItem.name}"`);
           }
           processedCount++;
-          
+
           // Обновляем прогресс
           const percent = Math.round((processedCount / totalItems) * 100);
           updateImportProgress(percent, `Обновлено ${processedCount} из ${totalItems}`);
-          
+
         } catch (error) {
           console.error(`Ошибка обновления изображения для "${duplicate.data.name}":`, error);
           failed++;
@@ -5420,10 +5583,10 @@ async function handleImport() {
         }
       }
     }
-    
+
     // Завершаем прогресс
     updateImportProgress(100, 'Завершение...');
-    
+
     // Формируем сообщение результата
     let message = '';
     if (imported > 0) {
@@ -5438,18 +5601,18 @@ async function handleImport() {
     if (!message) {
       message = 'Нет изменений';
     }
-    
+
     console.log('Импорт завершен:', message);
-    
+
     // Очищаем данные
     importedData = { items: [], errors: [], duplicates: [] };
-    
+
     // Скрываем прогресс и показываем модалку успеха
     setTimeout(() => {
       hideImportProgressModal();
       showImportSuccessModal(message);
     }, 500);
-    
+
   } catch (error) {
     console.error('Критическая ошибка импорта:', error);
     hideImportProgressModal();
@@ -5466,7 +5629,7 @@ function showImportProgressModal(title, subtitle) {
   const subtitleEl = document.getElementById('import-progress-subtitle');
   const percentageEl = document.getElementById('import-progress-percentage');
   const fillEl = document.getElementById('import-progress-fill');
-  
+
   if (modal) {
     if (titleEl) titleEl.textContent = title;
     if (subtitleEl) subtitleEl.textContent = subtitle;
@@ -5484,7 +5647,7 @@ function updateImportProgress(percent, subtitle) {
   const percentageEl = document.getElementById('import-progress-percentage');
   const subtitleEl = document.getElementById('import-progress-subtitle');
   const fillEl = document.getElementById('import-progress-fill');
-  
+
   if (percentageEl) percentageEl.textContent = `${Math.round(percent)}%`;
   if (subtitleEl) subtitleEl.textContent = subtitle;
   if (fillEl) fillEl.style.width = `${percent}%`;
@@ -5509,12 +5672,12 @@ function showImportSuccessModal(message) {
   const messageEl = document.getElementById('import-success-message');
   const stayBtn = document.getElementById('import-success-stay-btn');
   const goBtn = document.getElementById('import-success-go-btn');
-  
+
   if (modal) {
     if (messageEl) messageEl.textContent = message;
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-    
+
     // Обработчик "Остаться"
     if (stayBtn) {
       stayBtn.onclick = () => {
@@ -5524,7 +5687,7 @@ function showImportSuccessModal(message) {
         resetImportPageUI();
       };
     }
-    
+
     // Обработчик "К товарам"
     if (goBtn) {
       goBtn.onclick = () => {
@@ -5544,19 +5707,19 @@ function resetImportPageUI() {
   const defaultContent = document.getElementById('upload-default-content');
   const successContent = document.getElementById('upload-success-content');
   const fileSuccessIcon = document.getElementById('file-success-icon');
-  
+
   if (defaultContent) defaultContent.classList.remove('hidden');
   if (successContent) successContent.classList.add('hidden');
   if (fileSuccessIcon) fileSuccessIcon.classList.add('hidden');
-  
+
   // Очищаем предпросмотр
   const previewContainer = document.getElementById('import-preview');
   if (previewContainer) previewContainer.innerHTML = '';
-  
+
   // Скрываем фильтры
   const filterButtons = document.getElementById('filter-buttons');
   if (filterButtons) filterButtons.classList.add('hidden');
-  
+
   // Сбрасываем кнопку импорта
   const importBtn = document.getElementById('import-btn');
   if (importBtn) {
@@ -5579,16 +5742,16 @@ window.handleImport = handleImport;
  */
 function initItemsManagementPage() {
   console.log('Инициализация страницы управления данными...');
-  
+
   // Загружаем статистику при открытии страницы
   loadDataStats();
-  
+
   // Получаем элементы карточек
   const exportCard = document.getElementById('export-card');
   const importCard = document.getElementById('import-card');
   const deleteCard = document.getElementById('delete-card');
   const helpBtn = document.getElementById('help-btn');
-  
+
   // Обработчик кнопки "Экспорт данных"
   if (exportCard) {
     exportCard.addEventListener('click', async () => {
@@ -5596,7 +5759,7 @@ function initItemsManagementPage() {
       await handleExportData();
     });
   }
-  
+
   // Обработчик кнопки "Импорт данных" - переход на страницу импорта
   if (importCard) {
     importCard.addEventListener('click', () => {
@@ -5604,7 +5767,7 @@ function initItemsManagementPage() {
       navigateTo('items-import.html');
     });
   }
-  
+
   // Обработчик кнопки "Удалить все данные"
   if (deleteCard) {
     deleteCard.addEventListener('click', () => {
@@ -5612,14 +5775,14 @@ function initItemsManagementPage() {
       showDeleteConfirmModal();
     });
   }
-  
+
   // Обработчик кнопки справки
   if (helpBtn) {
     helpBtn.addEventListener('click', () => {
       showManagementHelpModal();
     });
   }
-  
+
   // Настраиваем модальные окна
   setupManagementModals();
 }
@@ -5631,10 +5794,10 @@ async function loadDataStats() {
   try {
     const allItems = await items.getAllItems();
     const categories = [...new Set(allItems.map(item => item.category).filter(Boolean))];
-    
+
     const itemsCountEl = document.getElementById('stats-items-count');
     const categoriesCountEl = document.getElementById('stats-categories-count');
-    
+
     if (itemsCountEl) itemsCountEl.textContent = allItems.length;
     if (categoriesCountEl) categoriesCountEl.textContent = categories.length;
   } catch (error) {
@@ -5656,24 +5819,24 @@ function showProgressModal(title, subtitle, isRed = false) {
   const subtitleEl = document.getElementById('progress-subtitle');
   const percentageEl = document.getElementById('progress-percentage');
   const timeEl = document.getElementById('progress-time');
-  
+
   if (modal) {
     // Устанавливаем цвет прогресса (красный для удаления, синий для остального)
     if (linearProgress) {
       linearProgress.classList.toggle('red', isRed);
     }
-    
+
     // Сбрасываем прогресс
     if (progressBar) {
       progressBar.style.width = '0%';
     }
     if (percentageEl) percentageEl.textContent = '0%';
     if (timeEl) timeEl.textContent = '';
-    
+
     // Устанавливаем текст
     if (titleEl) titleEl.textContent = title;
     if (subtitleEl) subtitleEl.textContent = subtitle;
-    
+
     // Показываем модальное окно
     modal.classList.add('active');
   }
@@ -5688,7 +5851,7 @@ function updateProgress(percent, timeText = '') {
   const progressBar = document.getElementById('progress-bar');
   const percentageEl = document.getElementById('progress-percentage');
   const timeEl = document.getElementById('progress-time');
-  
+
   // Обновляем ширину линейного прогресс-бара
   if (progressBar) {
     progressBar.style.width = `${Math.round(percent)}%`;
@@ -5720,7 +5883,7 @@ function showSuccessModal(title, message) {
   const modal = document.getElementById('success-modal');
   const titleEl = document.getElementById('success-title');
   const messageEl = document.getElementById('success-message');
-  
+
   if (modal) {
     if (titleEl) titleEl.textContent = title;
     if (messageEl) messageEl.textContent = message;
@@ -5767,7 +5930,7 @@ function setupManagementModals() {
   if (cancelDeleteBtn) {
     cancelDeleteBtn.addEventListener('click', hideDeleteConfirmModal);
   }
-  
+
   // Кнопка подтверждения удаления
   const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
   if (confirmDeleteBtn) {
@@ -5776,7 +5939,7 @@ function setupManagementModals() {
       await handleDeleteAllData();
     });
   }
-  
+
   // Кнопка OK в модальном окне успеха
   const successOkBtn = document.getElementById('success-ok-btn');
   if (successOkBtn) {
@@ -5793,29 +5956,29 @@ function setupManagementModals() {
  */
 async function handleExportData() {
   console.log('Начинаем экспорт данных...');
-  
+
   try {
     // Показываем прогресс (синий цвет)
     showProgressModal('Выгрузка данных...', 'Пожалуйста, не закрывайте приложение', false);
-    
+
     const startTime = Date.now();
-    
+
     // Получаем все товары
     updateProgress(10, '~5 сек');
     const allItems = await items.getAllItems();
-    
+
     if (allItems.length === 0) {
       hideProgressModal();
       showSuccessModal('База пуста', 'Нет данных для экспорта. Сначала добавьте товары.');
       return;
     }
-    
+
     updateProgress(30);
-    
+
     // Подготавливаем данные для Excel
     // Заголовки столбцов на русском
     const headers = ['Название', 'Категория', 'Единица измерения', 'Место хранения', 'Артикул', 'Изображение', 'Дата создания'];
-    
+
     // Преобразуем данные
     const rows = allItems.map(item => [
       item.name || '',
@@ -5826,14 +5989,14 @@ async function handleExportData() {
       item.image_url || '',
       item.created_at ? new Date(item.created_at).toLocaleDateString('ru-RU') : ''
     ]);
-    
+
     updateProgress(50);
-    
+
     // Создаем рабочую книгу Excel
     const wb = XLSX.utils.book_new();
     const wsData = [headers, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    
+
     // Устанавливаем ширину столбцов
     ws['!cols'] = [
       { wch: 30 }, // Название
@@ -5844,33 +6007,33 @@ async function handleExportData() {
       { wch: 50 }, // Изображение URL
       { wch: 15 }  // Дата
     ];
-    
+
     updateProgress(70);
-    
+
     // Добавляем лист в книгу
     XLSX.utils.book_append_sheet(wb, ws, 'Товары');
-    
+
     updateProgress(85);
-    
+
     // Генерируем имя файла с датой
     const date = new Date();
     const dateStr = date.toISOString().split('T')[0];
     const fileName = `Инвентура_экспорт_${dateStr}.xlsx`;
-    
+
     // Скачиваем файл
     XLSX.writeFile(wb, fileName);
-    
+
     updateProgress(100);
-    
+
     // Вычисляем время выполнения
     const duration = Math.round((Date.now() - startTime) / 1000);
-    
+
     // Небольшая задержка перед показом успеха
     setTimeout(() => {
       hideProgressModal();
       showSuccessModal('Экспорт завершён!', `Файл "${fileName}" успешно создан. Экспортировано ${allItems.length} товаров за ${duration} сек.`);
     }, 500);
-    
+
   } catch (error) {
     console.error('Ошибка экспорта:', error);
     hideProgressModal();
@@ -5883,30 +6046,30 @@ async function handleExportData() {
  */
 async function handleDeleteAllData() {
   console.log('Начинаем удаление всех данных...');
-  
+
   try {
     // Показываем прогресс (красный цвет)
     showProgressModal('Удаление базы...', 'Не закрывайте приложение', true);
-    
+
     const startTime = Date.now();
-    
+
     // Получаем все товары для подсчета
     updateProgress(10);
     const allItems = await items.getAllItems();
     const totalItems = allItems.length;
-    
+
     if (totalItems === 0) {
       hideProgressModal();
       showSuccessModal('База уже пуста', 'Нет данных для удаления.');
       return;
     }
-    
+
     updateProgress(20);
-    
+
     // Удаляем товары с сервера (Supabase)
     let deletedFromServer = 0;
     let serverErrors = 0;
-    
+
     for (let i = 0; i < allItems.length; i++) {
       try {
         // Пытаемся удалить с сервера
@@ -5917,17 +6080,17 @@ async function handleDeleteAllData() {
         console.warn('Не удалось удалить с сервера:', allItems[i].id, err.message);
         serverErrors++;
       }
-      
+
       // Обновляем прогресс (от 20% до 60%)
       const progress = 20 + (40 * (i + 1) / totalItems);
       updateProgress(progress);
     }
-    
+
     updateProgress(65);
-    
+
     // Удаляем товары из локальной базы (IndexedDB)
     let deletedLocally = 0;
-    
+
     for (let i = 0; i < allItems.length; i++) {
       try {
         await db.deleteItem(allItems[i].id);
@@ -5935,32 +6098,32 @@ async function handleDeleteAllData() {
       } catch (err) {
         console.error('Ошибка удаления из локальной базы:', err);
       }
-      
+
       // Обновляем прогресс (от 65% до 95%)
       const progress = 65 + (30 * (i + 1) / totalItems);
       updateProgress(progress);
     }
-    
+
     updateProgress(100);
-    
+
     // Вычисляем время выполнения
     const duration = Math.round((Date.now() - startTime) / 1000);
-    
+
     // Небольшая задержка перед показом успеха
     setTimeout(() => {
       hideProgressModal();
-      
+
       let message = `Удалено ${deletedLocally} товаров за ${duration} сек.`;
       if (serverErrors > 0) {
         message += ` (${serverErrors} не было на сервере)`;
       }
-      
+
       showSuccessModal('Удаление завершено!', message);
-      
+
       // Обновляем статистику
       loadDataStats();
     }, 500);
-    
+
   } catch (error) {
     console.error('Ошибка удаления:', error);
     hideProgressModal();
@@ -5976,7 +6139,7 @@ function showManagementHelpModal() {
   if (document.getElementById('management-help-modal')) {
     return;
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'management-help-modal';
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
@@ -6027,20 +6190,20 @@ function showManagementHelpModal() {
       </div>
     </div>
   `;
-  
+
   document.body.appendChild(modal);
-  
+
   // Обработчики закрытия
   const closeButtons = modal.querySelectorAll('#close-management-help, #close-management-help-btn');
   closeButtons.forEach(btn => {
     btn.addEventListener('click', () => modal.remove());
   });
-  
+
   // Закрытие по клику вне модального окна
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.remove();
   });
-  
+
   // Закрытие по Escape
   const handleEscape = (e) => {
     if (e.key === 'Escape') {
@@ -6056,17 +6219,17 @@ function showManagementHelpModal() {
  */
 function initItemsImportPage() {
   console.log('Инициализация страницы импорта...');
-  
+
   // Устанавливаем фильтр по умолчанию
   window.currentImportFilter = 'all';
-  
+
   // Элементы страницы
   const selectFileBtn = document.getElementById('select-file-btn');
   const dropZone = document.getElementById('drop-zone');
   const importBtn = document.getElementById('import-btn');
   const helpBtn = document.getElementById('help-btn');
   const filterButtons = document.querySelectorAll('.filter-btn');
-  
+
   // Создаем скрытый input для выбора файла
   let fileInput = document.getElementById('hidden-file-input');
   if (!fileInput) {
@@ -6085,12 +6248,12 @@ function initItemsImportPage() {
     });
     document.body.appendChild(fileInput);
   }
-  
+
   // Функция открытия выбора файла
-  window.openFilePicker = function() {
+  window.openFilePicker = function () {
     fileInput.click();
   };
-  
+
   // Обработчик кнопки "Выбрать файл"
   if (selectFileBtn) {
     selectFileBtn.addEventListener('click', (e) => {
@@ -6099,7 +6262,7 @@ function initItemsImportPage() {
       window.openFilePicker();
     });
   }
-  
+
   // Обработчик клика по зоне загрузки
   if (dropZone) {
     dropZone.addEventListener('click', (e) => {
@@ -6107,21 +6270,21 @@ function initItemsImportPage() {
       if (e.target.closest('button')) return;
       window.openFilePicker();
     });
-    
+
     // Drag & Drop
     dropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
       dropZone.classList.add('bg-blue-100', 'dark:bg-blue-900/30');
     });
-    
+
     dropZone.addEventListener('dragleave', () => {
       dropZone.classList.remove('bg-blue-100', 'dark:bg-blue-900/30');
     });
-    
+
     dropZone.addEventListener('drop', async (e) => {
       e.preventDefault();
       dropZone.classList.remove('bg-blue-100', 'dark:bg-blue-900/30');
-      
+
       const file = e.dataTransfer.files[0];
       if (file) {
         console.log('Файл перетащен:', file.name);
@@ -6129,29 +6292,29 @@ function initItemsImportPage() {
       }
     });
   }
-  
+
   // Обработчик кнопки "Импортировать"
   if (importBtn) {
     importBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      
+
       if (importBtn.disabled) {
         console.warn('Кнопка отключена');
         return;
       }
-      
+
       console.log('Кнопка "Импортировать" нажата');
       await handleImport();
     });
   }
-  
+
   // Обработчики кнопок фильтров
   filterButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const filter = btn.dataset.filter;
       window.currentImportFilter = filter;
-      
+
       // Обновляем активную кнопку
       filterButtons.forEach(b => {
         if (b.dataset.filter === filter) {
@@ -6162,21 +6325,21 @@ function initItemsImportPage() {
           b.classList.add('bg-white', 'dark:bg-surface-dark');
         }
       });
-      
+
       // Перерисовываем предпросмотр с фильтром
       if (importedData && (importedData.items.length > 0 || importedData.errors.length > 0 || importedData.duplicates.length > 0)) {
         renderImportPreview(importedData);
       }
     });
   });
-  
+
   // Обработчик кнопки справки
   if (helpBtn) {
     helpBtn.addEventListener('click', () => {
       showHelpModal();
     });
   }
-  
+
   console.log('Инициализация страницы импорта завершена');
 }
 
@@ -6188,7 +6351,7 @@ function showHelpModal() {
   if (document.getElementById('help-modal')) {
     return;
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'help-modal';
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
@@ -6244,9 +6407,9 @@ function showHelpModal() {
       </div>
     </div>
   `;
-  
+
   document.body.appendChild(modal);
-  
+
   // Обработчики закрытия
   const closeButtons = modal.querySelectorAll('#close-help-modal, #close-help-modal-btn');
   closeButtons.forEach(btn => {
@@ -6254,14 +6417,14 @@ function showHelpModal() {
       modal.remove();
     });
   });
-  
+
   // Закрытие по клику вне модального окна
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       modal.remove();
     }
   });
-  
+
   // Закрытие по Escape
   const handleEscape = (e) => {
     if (e.key === 'Escape') {
@@ -6281,7 +6444,7 @@ async function initInventoryHistoryPage() {
     const reports = await inventory.getAllInventoryReports();
     const sortedReports = reports
       .sort((a, b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at));
-    
+
     renderHistoryList(sortedReports);
   } catch (error) {
     console.error('Ошибка инициализации страницы истории:', error);
@@ -6298,10 +6461,10 @@ async function initInventoryHistoryPage() {
 function renderHistoryList(reports) {
   const archiveSection = document.querySelector('section:last-of-type');
   if (!archiveSection) return;
-  
+
   const archiveList = archiveSection.querySelector('.bg-white.dark\\:bg-slate-800');
   if (!archiveList) return;
-  
+
   if (reports.length === 0) {
     archiveList.innerHTML = `
       <div class="p-8 text-center text-slate-400 dark:text-slate-500">
@@ -6311,27 +6474,27 @@ function renderHistoryList(reports) {
     `;
     return;
   }
-  
+
   archiveList.innerHTML = reports.map(report => {
     const reportDate = new Date(report.date || report.created_at);
     const options = { month: 'long', year: 'numeric' };
     const formattedDate = reportDate.toLocaleDateString('ru-RU', options);
     const dayDate = reportDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
-    
+
     // Вычисляем процент изменения (упрощенная версия)
-    const differencePercent = report.items_with_difference > 0 
+    const differencePercent = report.items_with_difference > 0
       ? ((report.items_with_difference / report.total_items) * 100).toFixed(1)
       : '0.0';
-    
+
     const isPositive = report.positive_difference > report.negative_difference;
-    const percentClass = isPositive 
+    const percentClass = isPositive
       ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
       : report.negative_difference > report.positive_difference
-      ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
-      : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400';
-    
+        ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400';
+
     const percentSign = isPositive ? '+' : report.negative_difference > report.positive_difference ? '-' : '';
-    
+
     return `
       <div class="group flex items-center justify-between p-4 active:bg-slate-50 dark:active:bg-slate-700/50 transition-colors cursor-pointer">
         <div class="flex items-center gap-4">
@@ -6359,10 +6522,10 @@ function renderHistoryList(reports) {
  * 
  * @param {string} message - Текст ошибки
  */
-function showError(message) {
+async function showError(message) {
   console.error(message);
   // Здесь можно добавить отображение ошибки в UI
-  alert('Ошибка: ' + message);
+  await showAlert('Ошибка: ' + message, 'Ошибка');
 }
 
 /**

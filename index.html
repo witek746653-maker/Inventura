@@ -1,187 +1,240 @@
 <!DOCTYPE html>
 <html class="light" lang="ru">
+
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Главный экран инвентаризации</title>
-<!-- PWA мета-теги -->
-<meta name="theme-color" content="#137fec"/>
-<meta name="description" content="Приложение для инвентаризации ресторана Sabor de la Vida"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-<meta name="apple-mobile-web-app-title" content="Инвентура"/>
-<link rel="manifest" href="manifest.json"/>
-<link rel="apple-touch-icon" href="assets/icons/icon-192.svg"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/tailwind.css"/>
-<style>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Главный экран инвентаризации</title>
+    <!-- PWA мета-теги -->
+    <meta name="theme-color" content="#137fec" />
+    <meta name="description" content="Приложение для инвентаризации ресторана Sabor de la Vida" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Инвентура" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.svg" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="assets/tailwind.css" />
+    <style>
         body {
             font-family: 'Inter', "Noto Sans", sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
+
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
+
         .filled-icon {
             font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
+
         .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
+
         .no-scrollbar {
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+
         .pb-safe {
             padding-bottom: env(safe-area-inset-bottom, 20px);
         }
     </style>
 </head>
-<body class="bg-background-light dark:bg-background-dark min-h-screen text-slate-900 dark:text-slate-100 flex flex-col font-display selection:bg-primary/30">
-<div class="w-full max-w-7xl mx-auto flex-1 flex flex-col">
-<!-- Шапка с логотипом ресторана -->
-<header class="sticky top-0 z-50 bg-white dark:bg-surface-dark px-4 py-4 flex items-center justify-center border-b border-slate-200 dark:border-slate-800">
-<img src="assets/images/logo-sabor.png" alt="Sabor de la Vida - Ресторан" class="h-16 md:h-20 object-contain">
-</header>
-<main class="flex-1 px-4 pb-28 pt-4 flex flex-col gap-6 overflow-y-auto no-scrollbar">
-<section>
-<h2 class="text-2xl font-bold text-slate-900 dark:text-white">Обзор инвентаризации</h2>
-<p class="text-slate-500 dark:text-slate-400 text-sm mt-1" id="current-date">Сегодня</p>
-</section>
-<section class="bg-surface-light dark:bg-surface-dark rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] dark:shadow-none border border-slate-100 dark:border-slate-800 overflow-hidden relative">
-<div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-<span class="material-symbols-outlined text-[120px] text-primary">inventory_2</span>
-</div>
-<div class="p-5 relative z-10">
-<div class="flex justify-between items-start mb-4">
-<div>
-<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-primary text-xs font-bold mb-2" id="session-status" style="display: none;">
-<span class="relative flex h-2 w-2">
-<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-</span>
-В процессе
-</div>
-<h3 class="text-xl font-bold text-slate-900 dark:text-white" id="session-title">Нет активной сессии</h3>
-</div>
-</div>
-<div class="mb-4" id="session-progress" style="display: none;">
-<div class="flex justify-between text-sm mb-2">
-<span class="text-slate-600 dark:text-slate-300 font-medium">Прогресс подсчета</span>
-<span class="text-primary font-bold" id="progress-percent">0%</span>
-</div>
-<div class="h-3 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-<div class="h-full bg-primary rounded-full transition-all duration-500 ease-out" id="progress-bar" style="width: 0%"></div>
-</div>
-<p class="text-xs text-slate-400 dark:text-slate-500 mt-2" id="progress-text">Обработано 0 из 0 позиций</p>
-</div>
-<button class="w-full h-14 bg-primary hover:bg-blue-600 active:scale-[0.98] transition-all rounded-xl flex items-center justify-center gap-2 text-white font-bold text-lg shadow-lg shadow-blue-500/30" data-continue-session>
-<span class="material-symbols-outlined filled-icon">play_arrow</span>
-Продолжить
-</button>
-<button class="w-full h-14 bg-red-500 hover:bg-red-600 active:scale-[0.98] transition-all rounded-xl flex items-center justify-center gap-2 text-white font-bold text-lg shadow-lg shadow-red-500/30 mt-2" data-complete-session style="display: none;">
-<span class="material-symbols-outlined filled-icon">stop</span>
-Закончить инвентаризацию
-</button>
-<button class="w-full h-14 bg-primary hover:bg-blue-600 active:scale-[0.98] transition-all rounded-xl flex items-center justify-center gap-2 text-white font-bold text-lg shadow-lg shadow-blue-500/30 mt-2" data-new-session style="display: none;">
-<span class="material-symbols-outlined filled-icon">play_arrow</span>
-Начать
-</button>
-</div>
-</section>
-<section class="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4 border border-orange-100 dark:border-orange-800/30 flex items-start gap-3" id="warnings-section" style="display: none;">
-<div class="bg-orange-100 dark:bg-orange-800/50 p-2 rounded-lg text-orange-600 dark:text-orange-400 shrink-0">
-<span class="material-symbols-outlined">warning</span>
-</div>
-<div class="flex-1">
-<h4 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">Обнаружены расхождения</h4>
-<p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed" id="warnings-text">
-</p>
-</div>
-</section>
-<section class="grid grid-cols-2 gap-4">
-<div class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-<div class="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-2">
-<span class="material-symbols-outlined text-[20px]">inventory</span>
-<span class="text-xs font-medium">Всего позиций</span>
-</div>
-<p class="text-lg font-bold text-slate-900 dark:text-white" id="total-items">0 шт.</p>
-<p class="text-xs text-slate-500 flex items-center gap-0.5 mt-1">
-В активном меню
-</p>
-</div>
-<div class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-<div class="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-2">
-<span class="material-symbols-outlined text-[20px]">category</span>
-<span class="text-xs font-medium">Категории</span>
-</div>
-<p class="text-lg font-bold text-slate-900 dark:text-white" id="total-categories">0</p>
-<p class="text-xs text-slate-500 flex items-center gap-0.5 mt-1">
-Секций склада
-</p>
-</div>
-</section>
-<section>
-<div class="flex items-center justify-between mb-3 px-1">
-<h3 class="text-lg font-bold text-slate-900 dark:text-white">История</h3>
-<button class="text-primary text-sm font-medium hover:text-blue-600" data-navigate="inventory-history.html">Все отчеты</button>
-</div>
-<div class="flex flex-col gap-3" id="history-list">
-<!-- История будет загружена через JavaScript -->
-</div>
-</section>
-</main>
-</div>
-<nav class="fixed bottom-0 left-0 w-full bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 h-[80px] z-[100] shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)]">
-<div class="flex justify-between items-center max-w-md mx-auto h-full pb-4">
-<button class="flex flex-col items-center justify-center gap-1 w-16 text-primary nav-button" data-nav-page="index">
-<span class="material-symbols-outlined filled-icon text-[26px]">dashboard</span>
-<span class="text-[10px] font-medium">Главная</span>
-</button>
-<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="items.html" data-nav-page="items">
-<span class="material-symbols-outlined text-[26px]">list_alt</span>
-<span class="text-[10px] font-medium">Список</span>
-</button>
-<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="items-management.html" data-nav-page="management">
-<span class="material-symbols-outlined text-[26px]">settings</span>
-<span class="text-[10px] font-medium">Данные</span>
-</button>
-<button class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button" data-navigate="inventory-history.html" data-nav-page="history">
-<span class="material-symbols-outlined text-[26px]">bar_chart</span>
-<span class="text-[10px] font-medium">Отчеты</span>
-</button>
-</div>
-</nav>
 
-<!-- Модальное окно для завершения инвентаризации и формирования отчета -->
-<div id="complete-modal" class="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center flex">
-<div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl">
-<h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Завершить инвентаризацию?</h3>
-<p class="text-sm text-slate-600 dark:text-slate-400 mb-6">Вы хотите завершить текущую инвентаризацию и сформировать отчет?</p>
-<div class="flex gap-3">
-<button id="complete-yes" class="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
-Сформировать отчет
-</button>
-<button id="complete-cancel" class="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
-Отмена
-</button>
-</div>
-</div>
-</div>
+<body
+    class="bg-background-light dark:bg-background-dark min-h-screen text-slate-900 dark:text-slate-100 flex flex-col font-display selection:bg-primary/30">
+    <div class="w-full max-w-7xl mx-auto flex-1 flex flex-col">
+        <!-- Шапка с логотипом ресторана -->
+        <header
+            class="sticky top-0 z-50 bg-white dark:bg-surface-dark px-4 py-4 flex items-center justify-center border-b border-slate-200 dark:border-slate-800">
+            <img src="assets/images/logo-sabor.png" alt="Sabor de la Vida - Ресторан"
+                class="h-16 md:h-20 object-contain">
+        </header>
+        <main class="flex-1 px-4 pb-28 pt-4 flex flex-col gap-6 overflow-y-auto no-scrollbar">
+            <section>
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white">Обзор инвентаризации</h2>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-1" id="current-date">Сегодня</p>
+            </section>
+            <section
+                class="bg-surface-light dark:bg-surface-dark rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] dark:shadow-none border border-slate-100 dark:border-slate-800 overflow-hidden relative">
+                <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                    <span class="material-symbols-outlined text-[120px] text-primary">inventory_2</span>
+                </div>
+                <div class="p-5 relative z-10">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-primary text-xs font-bold mb-2"
+                                id="session-status" style="display: none;">
+                                <span class="relative flex h-2 w-2">
+                                    <span
+                                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                                </span>
+                                В процессе
+                            </div>
+                            <h3 class="text-xl font-bold text-slate-900 dark:text-white" id="session-title">Нет активной
+                                сессии</h3>
+                        </div>
+                    </div>
+                    <div class="mb-4" id="session-progress" style="display: none;">
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="text-slate-600 dark:text-slate-300 font-medium">Прогресс подсчета</span>
+                            <span class="text-primary font-bold" id="progress-percent">0%</span>
+                        </div>
+                        <div class="h-3 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div class="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                                id="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-xs text-slate-400 dark:text-slate-500 mt-2" id="progress-text">Обработано 0 из 0
+                            позиций</p>
+                    </div>
+                    <button
+                        class="w-full h-14 bg-primary hover:bg-blue-600 active:scale-[0.98] transition-all rounded-xl flex items-center justify-center gap-2 text-white font-bold text-lg shadow-lg shadow-blue-500/30"
+                        data-continue-session>
+                        <span class="material-symbols-outlined filled-icon">play_arrow</span>
+                        Продолжить
+                    </button>
+                    <button
+                        class="w-full h-14 bg-red-500 hover:bg-red-600 active:scale-[0.98] transition-all rounded-xl flex items-center justify-center gap-2 text-white font-bold text-lg shadow-lg shadow-red-500/30 mt-2"
+                        data-complete-session style="display: none;">
+                        <span class="material-symbols-outlined filled-icon">stop</span>
+                        Закончить инвентаризацию
+                    </button>
+                    <button
+                        class="w-full h-14 bg-primary hover:bg-blue-600 active:scale-[0.98] transition-all rounded-xl flex items-center justify-center gap-2 text-white font-bold text-lg shadow-lg shadow-blue-500/30 mt-2"
+                        data-new-session style="display: none;">
+                        <span class="material-symbols-outlined filled-icon">play_arrow</span>
+                        Начать
+                    </button>
+                </div>
+            </section>
+            <section
+                class="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4 border border-orange-100 dark:border-orange-800/30 flex items-start gap-3"
+                id="warnings-section" style="display: none;">
+                <div
+                    class="bg-orange-100 dark:bg-orange-800/50 p-2 rounded-lg text-orange-600 dark:text-orange-400 shrink-0">
+                    <span class="material-symbols-outlined">warning</span>
+                </div>
+                <div class="flex-1">
+                    <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">Обнаружены расхождения</h4>
+                    <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed" id="warnings-text">
+                    </p>
+                </div>
+            </section>
+            <section class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div
+                    class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                    <div class="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-2">
+                        <span class="material-symbols-outlined text-[20px]">inventory</span>
+                        <span class="text-xs font-medium">Всего позиций</span>
+                    </div>
+                    <p class="text-lg font-bold text-slate-900 dark:text-white" id="total-items">0 шт.</p>
+                    <p class="text-xs text-slate-500 flex items-center gap-0.5 mt-1">
+                        В активном меню
+                    </p>
+                </div>
+                <div
+                    class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                    <div class="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-2">
+                        <span class="material-symbols-outlined text-[20px]">warehouse</span>
+                        <span class="text-xs font-medium">Секций склада</span>
+                    </div>
+                    <p class="text-lg font-bold text-slate-900 dark:text-white" id="total-warehouse-sections">0</p>
+                    <p class="text-xs text-slate-500 flex items-center gap-0.5 mt-1">
+                        Мест хранения
+                    </p>
+                </div>
+                <div
+                    class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                    <div class="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-2">
+                        <span class="material-symbols-outlined text-[20px]">category</span>
+                        <span class="text-xs font-medium">Категорий</span>
+                    </div>
+                    <p class="text-lg font-bold text-slate-900 dark:text-white" id="total-categories">0</p>
+                    <p class="text-xs text-slate-500 flex items-center gap-0.5 mt-1">
+                        Типов товаров
+                    </p>
+                </div>
+            </section>
+            <section>
+                <div class="flex items-center justify-between mb-3 px-1">
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">История</h3>
+                    <button class="text-primary text-sm font-medium hover:text-blue-600"
+                        data-navigate="inventory-history.html">Все отчеты</button>
+                </div>
+                <div class="flex flex-col gap-3" id="history-list">
+                    <!-- История будет загружена через JavaScript -->
+                </div>
+            </section>
+        </main>
+    </div>
+    <nav
+        class="fixed bottom-0 left-0 w-full bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 h-[80px] z-[100] shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)]">
+        <div class="flex justify-between items-center max-w-md mx-auto h-full pb-4">
+            <button class="flex flex-col items-center justify-center gap-1 w-16 text-primary nav-button"
+                data-nav-page="index">
+                <span class="material-symbols-outlined filled-icon text-[26px]">dashboard</span>
+                <span class="text-[10px] font-medium">Главная</span>
+            </button>
+            <button
+                class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button"
+                data-navigate="items.html" data-nav-page="items">
+                <span class="material-symbols-outlined text-[26px]">list_alt</span>
+                <span class="text-[10px] font-medium">Список</span>
+            </button>
+            <button
+                class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button"
+                data-navigate="items-management.html" data-nav-page="management">
+                <span class="material-symbols-outlined text-[26px]">settings</span>
+                <span class="text-[10px] font-medium">Данные</span>
+            </button>
+            <button
+                class="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors nav-button"
+                data-navigate="inventory-history.html" data-nav-page="history">
+                <span class="material-symbols-outlined text-[26px]">bar_chart</span>
+                <span class="text-[10px] font-medium">Отчеты</span>
+            </button>
+        </div>
+    </nav>
 
-<!-- Подключение JavaScript модулей -->
-<script type="module" src="js/app.js"></script>
-<!-- Регистрация Service Worker для PWA -->
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('Service Worker зарегистрирован:', reg.scope))
-      .catch(err => console.log('Service Worker ошибка:', err));
-  });
-}
-</script>
+    <!-- Модальное окно для завершения инвентаризации и формирования отчета -->
+    <div id="complete-modal"
+        class="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center flex">
+        <div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl">
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Завершить инвентаризацию?</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-6">Вы хотите завершить текущую инвентаризацию и
+                сформировать отчет?</p>
+            <div class="flex gap-3">
+                <button id="complete-yes"
+                    class="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
+                    Сформировать отчет
+                </button>
+                <button id="complete-cancel"
+                    class="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
+                    Отмена
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключение JavaScript модулей -->
+    <script type="module" src="js/app.js"></script>
+    <!-- Регистрация Service Worker для PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker зарегистрирован:', reg.scope))
+                    .catch(err => console.log('Service Worker ошибка:', err));
+            });
+        }
+    </script>
 </body>
-</html>
 
+</html>

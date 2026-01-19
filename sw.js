@@ -8,7 +8,7 @@
  */
 
 // Версия кэша — меняйте при обновлении приложения, чтобы пользователи получили новые файлы
-const CACHE_VERSION = 'v1.0.3';
+const CACHE_VERSION = 'v1.0.4';
 const CACHE_NAME = `sabor-inventura-${CACHE_VERSION}`;
 
 // Список файлов для кэширования (эти файлы будут доступны офлайн)
@@ -44,7 +44,7 @@ const FILES_TO_CACHE = [
  */
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Установка...');
-  
+
   // waitUntil говорит браузеру "подожди, пока эта операция завершится"
   event.waitUntil(
     // Открываем (или создаём) кэш с нашим именем
@@ -70,7 +70,7 @@ self.addEventListener('install', (event) => {
  */
 self.addEventListener('activate', (event) => {
   console.log('[Service Worker] Активация...');
-  
+
   event.waitUntil(
     // Получаем список всех кэшей
     caches.keys()
@@ -103,7 +103,7 @@ self.addEventListener('fetch', (event) => {
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
-  
+
   // Пропускаем POST, PUT, DELETE запросы (их нельзя кэшировать)
   if (event.request.method !== 'GET') {
     return;
@@ -152,7 +152,7 @@ self.addEventListener('push', (event) => {
       vibrate: [100, 50, 100],
       data: data.data || {}
     };
-    
+
     event.waitUntil(
       self.registration.showNotification(data.title || 'Инвентура', options)
     );
@@ -164,7 +164,7 @@ self.addEventListener('push', (event) => {
  */
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  
+
   event.waitUntil(
     clients.openWindow('/')
   );
