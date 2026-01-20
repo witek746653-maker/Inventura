@@ -44,6 +44,7 @@ export async function createItem(itemData) {
   }
   
   // Создаем объект товара с ID
+  const parsedCurrentQuantity = Number(itemData.current_quantity ?? itemData.quantity ?? 0);
   const item = {
     id: generateId(),
     name: itemData.name.trim(),
@@ -52,7 +53,8 @@ export async function createItem(itemData) {
     location: itemData.location || null,
     image_url: itemData.image_url || null,
     sku: itemData.sku || null,
-    description: itemData.description || null
+    description: itemData.description || null,
+    current_quantity: Number.isFinite(parsedCurrentQuantity) ? parsedCurrentQuantity : 0
   };
   
   try {
@@ -370,4 +372,3 @@ export async function getAllLocations() {
     throw error;
   }
 }
-

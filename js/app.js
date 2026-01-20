@@ -1452,9 +1452,11 @@ async function initItemDetailsPage() {
         if (!isEditMode || quantityDecrease.disabled) return;
 
         if (quantityInput) {
-          const currentValue = parseFloat(quantityInput.value) || 0;
-          const step = parseFloat(quantityInput.step) || 1;
-          const newValue = Math.max(0, currentValue - step);
+          const currentValue = Number.parseInt(quantityInput.value, 10);
+          const safeValue = Number.isFinite(currentValue) ? currentValue : 0;
+          const step = Number.parseInt(quantityInput.step, 10);
+          const safeStep = Number.isFinite(step) ? step : 1;
+          const newValue = Math.max(0, safeValue - safeStep);
           quantityInput.value = newValue;
           updateSaveButtonText(newValue);
         }
@@ -1467,9 +1469,11 @@ async function initItemDetailsPage() {
         if (!isEditMode || quantityIncrease.disabled) return;
 
         if (quantityInput) {
-          const currentValue = parseFloat(quantityInput.value) || 0;
-          const step = parseFloat(quantityInput.step) || 1;
-          const newValue = currentValue + step;
+          const currentValue = Number.parseInt(quantityInput.value, 10);
+          const safeValue = Number.isFinite(currentValue) ? currentValue : 0;
+          const step = Number.parseInt(quantityInput.step, 10);
+          const safeStep = Number.isFinite(step) ? step : 1;
+          const newValue = safeValue + safeStep;
           quantityInput.value = newValue;
           updateSaveButtonText(newValue);
         }
@@ -1480,8 +1484,9 @@ async function initItemDetailsPage() {
     if (quantityInput) {
       quantityInput.addEventListener('input', () => {
         if (!isEditMode) return;
-        const value = parseFloat(quantityInput.value) || 0;
-        updateSaveButtonText(value);
+        const value = Number.parseInt(quantityInput.value, 10);
+        const safeValue = Number.isFinite(value) ? value : 0;
+        updateSaveButtonText(safeValue);
       });
     }
 
@@ -1643,7 +1648,7 @@ function renderItemDetails(item) {
   // Текущий остаток
   const quantityInput = document.getElementById('item-quantity');
   if (quantityInput) {
-    quantityInput.value = currentQuantity;
+    quantityInput.value = item.quantity || 0;
   }
 
   // Статистика инвентаризации (Предыдущий замер и Разница)
@@ -1671,7 +1676,7 @@ function renderItemDetails(item) {
           const prevQty = historyItem ? (Number(historyItem.quantity) || 0) : 0;
 
           // 5. Считаем разницу
-          const currentQty = currentQuantity;
+          const currentQty = Number(item.quantity) || 0;
           const diff = currentQty - prevQty;
           const diffSign = diff > 0 ? '+' : '';
           const diffClass = diff > 0 ? 'text-green-500' : (diff < 0 ? 'text-red-500' : 'text-slate-400');
@@ -1971,10 +1976,7 @@ async function saveItemChanges() {
 
     // Количество (только в режиме редактирования)
     if (quantityInput && quantityInput.value !== undefined) {
-      const parsedQuantity = Number(quantityInput.value);
-      const normalizedQuantity = Number.isFinite(parsedQuantity) ? parsedQuantity : 0;
-      updates.quantity = normalizedQuantity;
-      updates.current_quantity = normalizedQuantity;
+      updates.quantity = parseFloat(quantityInput.value) || 0;
     }
 
     // Базовая валидация (без визуальных индикаторов ошибок)

@@ -172,8 +172,9 @@ async function loadData() {
       }
 
       // Если товар ещё не считали в этой сессии — создаем "пустую" запись
+      const currentQuantity = Number(it.current_quantity ?? it.quantity ?? 0);
       pageState.inventoryItems[it.id] = {
-        baseQuantity: 0,
+        baseQuantity: Number.isFinite(currentQuantity) ? currentQuantity : 0,
         previousQuantity: prevQty,
         comment: '',
         saved: true, // ИЗМЕНЕНО: теперь по умолчанию ставим true, чтобы автосохранение не записывало нетронутые товары в БД
