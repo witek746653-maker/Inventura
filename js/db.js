@@ -57,19 +57,19 @@ export async function initDB() {
         }, 500);
         return;
       }
-      
+
       isDeleting = true;
       console.warn('Обнаружен конфликт версий базы данных. Автоматически исправляем...');
-      
+
       // Закрываем текущее подключение, если оно есть
       if (db) {
         db.close();
         db = null;
       }
-      
+
       // Удаляем базу данных при конфликте версий
       const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-      
+
       deleteRequest.onsuccess = () => {
         console.log('База данных удалена. Создаем новую с версией', DB_VERSION);
         isDeleting = false;
@@ -78,7 +78,7 @@ export async function initDB() {
           initDB().then(resolve).catch(reject);
         }, 100);
       };
-      
+
       deleteRequest.onerror = (deleteEvent) => {
         const deleteError = deleteRequest.error || deleteEvent.target.error;
         console.error('Не удалось удалить базу данных:', deleteError);
@@ -97,7 +97,7 @@ export async function initDB() {
           };
         }, 500);
       };
-      
+
       deleteRequest.onblocked = () => {
         console.warn('База данных заблокирована. Закройте другие вкладки и попробуйте снова.');
         // Пытаемся удалить через задержку
@@ -136,14 +136,14 @@ export async function initDB() {
     request.onerror = (event) => {
       const error = request.error || event.target.error;
       console.error('Ошибка открытия базы данных:', error);
-      
+
       // Если ошибка версии (запрашиваемая версия меньше существующей),
       // обрабатываем её специальным образом
       if (error && (error.name === 'VersionError' || error.message?.includes('version') || error.message?.includes('less than'))) {
         handleVersionError();
         return;
       }
-      
+
       reject(error);
     };
 
@@ -226,7 +226,7 @@ export async function initDB() {
         reject(upgradeError);
       }
     };
-    
+
     // Обработка ошибок при обновлении (дополнительная защита)
     request.onblocked = () => {
       console.warn('Обновление базы данных заблокировано. Закройте другие вкладки.');
@@ -269,7 +269,7 @@ export async function addItem(item) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORES.ITEMS], 'readwrite');
     const store = transaction.objectStore(STORES.ITEMS);
-    
+
     // Добавляем метаданные
     const itemWithMeta = {
       ...item,
@@ -277,14 +277,14 @@ export async function addItem(item) {
       updated_at: new Date().toISOString(),
       synced: false // Флаг синхронизации с сервером
     };
-    
+
     const request = store.add(itemWithMeta);
-    
+
     request.onsuccess = () => {
       console.log('Товар добавлен локально:', itemWithMeta);
       resolve(itemWithMeta);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка добавления товара:', request.error);
       reject(request.error);
@@ -303,11 +303,11 @@ export async function getAllItems() {
     const transaction = database.transaction([STORES.ITEMS], 'readonly');
     const store = transaction.objectStore(STORES.ITEMS);
     const request = store.getAll();
-    
+
     request.onsuccess = () => {
       resolve(request.result);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка получения товаров:', request.error);
       reject(request.error);
@@ -327,11 +327,11 @@ export async function getItemById(id) {
     const transaction = database.transaction([STORES.ITEMS], 'readonly');
     const store = transaction.objectStore(STORES.ITEMS);
     const request = store.get(id);
-    
+
     request.onsuccess = () => {
       resolve(request.result);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка получения товара:', request.error);
       reject(request.error);
@@ -351,17 +351,17 @@ export async function updateItem(id, updates) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORES.ITEMS], 'readwrite');
     const store = transaction.objectStore(STORES.ITEMS);
-    
+
     // Сначала получаем существующий товар
     const getRequest = store.get(id);
-    
+
     getRequest.onsuccess = () => {
       const item = getRequest.result;
       if (!item) {
         reject(new Error('Товар не найден'));
         return;
       }
-      
+
       // Обновляем данные
       const updatedItem = {
         ...item,
@@ -369,20 +369,20 @@ export async function updateItem(id, updates) {
         updated_at: new Date().toISOString(),
         synced: false // Помечаем как не синхронизированный
       };
-      
+
       const putRequest = store.put(updatedItem);
-      
+
       putRequest.onsuccess = () => {
         console.log('Товар обновлен локально:', updatedItem);
         resolve(updatedItem);
       };
-      
+
       putRequest.onerror = () => {
         console.error('Ошибка обновления товара:', putRequest.error);
         reject(putRequest.error);
       };
     };
-    
+
     getRequest.onerror = () => {
       reject(getRequest.error);
     };
@@ -401,12 +401,12 @@ export async function deleteItem(id) {
     const transaction = database.transaction([STORES.ITEMS], 'readwrite');
     const store = transaction.objectStore(STORES.ITEMS);
     const request = store.delete(id);
-    
+
     request.onsuccess = () => {
       console.log('Товар удален локально:', id);
       resolve();
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка удаления товара:', request.error);
       reject(request.error);
@@ -425,21 +425,21 @@ export async function addInventorySession(session) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORES.INVENTORY_SESSIONS], 'readwrite');
     const store = transaction.objectStore(STORES.INVENTORY_SESSIONS);
-    
+
     const sessionWithMeta = {
       ...session,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       synced: false
     };
-    
+
     const request = store.add(sessionWithMeta);
-    
+
     request.onsuccess = () => {
       console.log('Сессия добавлена локально:', sessionWithMeta);
       resolve(sessionWithMeta);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка добавления сессии:', request.error);
       reject(request.error);
@@ -458,11 +458,11 @@ export async function getAllInventorySessions() {
     const transaction = database.transaction([STORES.INVENTORY_SESSIONS], 'readonly');
     const store = transaction.objectStore(STORES.INVENTORY_SESSIONS);
     const request = store.getAll();
-    
+
     request.onsuccess = () => {
       resolve(request.result);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка получения сессий:', request.error);
       reject(request.error);
@@ -482,11 +482,11 @@ export async function getInventorySessionById(id) {
     const transaction = database.transaction([STORES.INVENTORY_SESSIONS], 'readonly');
     const store = transaction.objectStore(STORES.INVENTORY_SESSIONS);
     const request = store.get(id);
-    
+
     request.onsuccess = () => {
       resolve(request.result);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка получения сессии:', request.error);
       reject(request.error);
@@ -506,35 +506,35 @@ export async function updateInventorySession(id, updates) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORES.INVENTORY_SESSIONS], 'readwrite');
     const store = transaction.objectStore(STORES.INVENTORY_SESSIONS);
-    
+
     const getRequest = store.get(id);
-    
+
     getRequest.onsuccess = () => {
       const session = getRequest.result;
       if (!session) {
         reject(new Error('Сессия не найдена'));
         return;
       }
-      
+
       const updatedSession = {
         ...session,
         ...updates,
         updated_at: new Date().toISOString(),
         synced: false
       };
-      
+
       const putRequest = store.put(updatedSession);
-      
+
       putRequest.onsuccess = () => {
         console.log('Сессия обновлена локально:', updatedSession);
         resolve(updatedSession);
       };
-      
+
       putRequest.onerror = () => {
         reject(putRequest.error);
       };
     };
-    
+
     getRequest.onerror = () => {
       reject(getRequest.error);
     };
@@ -552,21 +552,21 @@ export async function addInventoryItem(inventoryItem) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORES.INVENTORY_ITEMS], 'readwrite');
     const store = transaction.objectStore(STORES.INVENTORY_ITEMS);
-    
+
     const itemWithMeta = {
       ...inventoryItem,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       synced: false
     };
-    
+
     const request = store.add(itemWithMeta);
-    
+
     request.onsuccess = () => {
       console.log('Запись инвентаризации добавлена локально:', itemWithMeta);
       resolve(itemWithMeta);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка добавления записи:', request.error);
       reject(request.error);
@@ -587,11 +587,11 @@ export async function getInventoryItemsBySession(sessionId) {
     const store = transaction.objectStore(STORES.INVENTORY_ITEMS);
     const index = store.index('session_id');
     const request = index.getAll(sessionId);
-    
+
     request.onsuccess = () => {
       resolve(request.result);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка получения записей:', request.error);
       reject(request.error);
@@ -611,35 +611,35 @@ export async function updateInventoryItem(id, updates) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORES.INVENTORY_ITEMS], 'readwrite');
     const store = transaction.objectStore(STORES.INVENTORY_ITEMS);
-    
+
     const getRequest = store.get(id);
-    
+
     getRequest.onsuccess = () => {
       const item = getRequest.result;
       if (!item) {
         reject(new Error('Запись не найдена'));
         return;
       }
-      
+
       const updatedItem = {
         ...item,
         ...updates,
         updated_at: new Date().toISOString(),
         synced: false
       };
-      
+
       const putRequest = store.put(updatedItem);
-      
+
       putRequest.onsuccess = () => {
         console.log('Запись обновлена локально:', updatedItem);
         resolve(updatedItem);
       };
-      
+
       putRequest.onerror = () => {
         reject(putRequest.error);
       };
     };
-    
+
     getRequest.onerror = () => {
       reject(getRequest.error);
     };
@@ -659,13 +659,13 @@ export async function getUnsyncedItems(storeName) {
     const transaction = database.transaction([storeName], 'readonly');
     const store = transaction.objectStore(storeName);
     const request = store.getAll();
-    
+
     request.onsuccess = () => {
       // Фильтруем только несинхронизированные записи
       const unsynced = request.result.filter(item => !item.synced);
       resolve(unsynced);
     };
-    
+
     request.onerror = () => {
       reject(request.error);
     };
@@ -684,28 +684,28 @@ export async function markAsSynced(storeName, id) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([storeName], 'readwrite');
     const store = transaction.objectStore(storeName);
-    
+
     const getRequest = store.get(id);
-    
+
     getRequest.onsuccess = () => {
       const item = getRequest.result;
       if (!item) {
         reject(new Error('Запись не найдена'));
         return;
       }
-      
+
       item.synced = true;
       const putRequest = store.put(item);
-      
+
       putRequest.onsuccess = () => {
         resolve();
       };
-      
+
       putRequest.onerror = () => {
         reject(putRequest.error);
       };
     };
-    
+
     getRequest.onerror = () => {
       reject(getRequest.error);
     };
@@ -720,40 +720,40 @@ export async function markAsSynced(storeName, id) {
  */
 export async function addInventoryReport(report) {
   let database = await getDB();
-  
+
   // Проверяем существование хранилища
   if (!database.objectStoreNames.contains(STORES.INVENTORY_REPORTS)) {
     console.error('Хранилище отчетов не найдено в базе данных!');
     console.error('Попытка переоткрытия базы...');
     db = null;
     database = await initDB();
-    
+
     if (!database.objectStoreNames.contains(STORES.INVENTORY_REPORTS)) {
       const error = new Error('Хранилище отчетов не может быть создано. Пожалуйста, обновите страницу (Ctrl+R или F5) для обновления базы данных.');
       console.error(error.message);
       throw error;
     }
   }
-  
+
   return new Promise((resolve, reject) => {
     try {
       const transaction = database.transaction([STORES.INVENTORY_REPORTS], 'readwrite');
       const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
-      
+
       const reportWithMeta = {
         ...report,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         synced: false
       };
-      
+
       const request = store.add(reportWithMeta);
-      
+
       request.onsuccess = () => {
         console.log('Отчет добавлен локально:', reportWithMeta);
         resolve(reportWithMeta);
       };
-      
+
       request.onerror = () => {
         console.error('Ошибка добавления отчета:', request.error);
         reject(request.error);
@@ -776,11 +776,11 @@ export async function getAllInventoryReports() {
     const transaction = database.transaction([STORES.INVENTORY_REPORTS], 'readonly');
     const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
     const request = store.getAll();
-    
+
     request.onsuccess = () => {
       resolve(request.result);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка получения отчетов:', request.error);
       reject(request.error);
@@ -800,11 +800,11 @@ export async function getInventoryReportById(id) {
     const transaction = database.transaction([STORES.INVENTORY_REPORTS], 'readonly');
     const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
     const request = store.get(id);
-    
+
     request.onsuccess = () => {
       resolve(request.result);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка получения отчета:', request.error);
       reject(request.error);
@@ -825,11 +825,11 @@ export async function getInventoryReportBySessionId(sessionId) {
     const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
     const index = store.index('session_id');
     const request = index.get(sessionId);
-    
+
     request.onsuccess = () => {
       resolve(request.result);
     };
-    
+
     request.onerror = () => {
       console.error('Ошибка получения отчета по сессии:', request.error);
       reject(request.error);
@@ -849,35 +849,35 @@ export async function updateInventoryReport(id, updates) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORES.INVENTORY_REPORTS], 'readwrite');
     const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
-    
+
     const getRequest = store.get(id);
-    
+
     getRequest.onsuccess = () => {
       const report = getRequest.result;
       if (!report) {
         reject(new Error('Отчет не найден'));
         return;
       }
-      
+
       const updatedReport = {
         ...report,
         ...updates,
         updated_at: new Date().toISOString(),
         synced: false
       };
-      
+
       const putRequest = store.put(updatedReport);
-      
+
       putRequest.onsuccess = () => {
         console.log('Отчет обновлен локально:', updatedReport);
         resolve(updatedReport);
       };
-      
+
       putRequest.onerror = () => {
         reject(putRequest.error);
       };
     };
-    
+
     getRequest.onerror = () => {
       reject(getRequest.error);
     };
@@ -885,5 +885,106 @@ export async function updateInventoryReport(id, updates) {
 }
 
 // Экспортируем названия хранилищ для использования в других файлах
+
+/**
+ * Удалить сессию инвентаризации
+ * 
+ * @param {string} id - ID сессии
+ * @returns {Promise} - Promise с результатом операции
+ */
+export async function deleteInventorySession(id) {
+  const database = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORES.INVENTORY_SESSIONS], 'readwrite');
+    const store = transaction.objectStore(STORES.INVENTORY_SESSIONS);
+    const request = store.delete(id);
+
+    request.onsuccess = () => {
+      console.log('Сессия удалена локально:', id);
+      resolve();
+    };
+
+    request.onerror = () => {
+      console.error('Ошибка удаления сессии:', request.error);
+      reject(request.error);
+    };
+  });
+}
+
+/**
+ * Удалить все записи инвентаризации для сессии
+ * 
+ * @param {string} sessionId - ID сессии
+ * @returns {Promise} - Promise с результатом операции
+ */
+export async function deleteInventoryItemsBySession(sessionId) {
+  const database = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORES.INVENTORY_ITEMS], 'readwrite');
+    const store = transaction.objectStore(STORES.INVENTORY_ITEMS);
+    const index = store.index('session_id');
+    const request = index.getAllKeys(sessionId);
+
+    request.onsuccess = () => {
+      const keys = request.result;
+      if (keys.length === 0) {
+        resolve();
+        return;
+      }
+
+      let completed = 0;
+      let errors = 0;
+
+      // Создаем новую транзакцию для удаления, чтобы не блокировать
+      const deleteTransaction = database.transaction([STORES.INVENTORY_ITEMS], 'readwrite');
+      const deleteStore = deleteTransaction.objectStore(STORES.INVENTORY_ITEMS);
+
+      deleteTransaction.oncomplete = () => {
+        console.log(`Удалено ${completed} записей инвентаризации локально`);
+        resolve();
+      };
+
+      deleteTransaction.onerror = () => {
+        reject(deleteTransaction.error);
+      };
+
+      keys.forEach(key => {
+        deleteStore.delete(key);
+        completed++;
+      });
+    };
+
+    request.onerror = () => {
+      console.error('Ошибка поиска записей для удаления:', request.error);
+      reject(request.error);
+    };
+  });
+}
+
+/**
+ * Удалить отчет инвентаризации
+ * 
+ * @param {string} id - ID отчета
+ * @returns {Promise} - Promise с результатом операции
+ */
+export async function deleteInventoryReport(id) {
+  const database = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORES.INVENTORY_REPORTS], 'readwrite');
+    const store = transaction.objectStore(STORES.INVENTORY_REPORTS);
+    const request = store.delete(id);
+
+    request.onsuccess = () => {
+      console.log('Отчет удален локально:', id);
+      resolve();
+    };
+
+    request.onerror = () => {
+      console.error('Ошибка удаления отчета:', request.error);
+      reject(request.error);
+    };
+  });
+}
+
 export { STORES };
 

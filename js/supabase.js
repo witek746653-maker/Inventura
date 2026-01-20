@@ -820,3 +820,79 @@ export async function updateInventoryReport(id, updates) {
   }
 }
 
+/**
+ * Удалить сессию инвентаризации с сервера
+ * 
+ * @param {string} id - ID сессии
+ * @returns {Promise} - Promise с результатом операции
+ */
+export async function deleteInventorySession(id) {
+  try {
+    const response = await fetch(`${API_URL}/inventory_sessions?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+
+    if (!response.ok) {
+      // Игнорируем 404
+      if (response.status === 404) return true;
+      throw new Error(`Ошибка удаления сессии: ${response.statusText}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Ошибка удаления сессии с сервера:', error);
+    throw error;
+  }
+}
+
+/**
+ * Удалить записи инвентаризации сессии с сервера
+ * 
+ * @param {string} sessionId - ID сессии
+ * @returns {Promise} - Promise с результатом операции
+ */
+export async function deleteInventoryItemsBySession(sessionId) {
+  try {
+    const response = await fetch(`${API_URL}/inventory_items?session_id=eq.${sessionId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) return true;
+      throw new Error(`Ошибка удаления записей: ${response.statusText}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Ошибка удаления записей с сервера:', error);
+    throw error;
+  }
+}
+
+/**
+ * Удалить отчет инвентаризации с сервера
+ * 
+ * @param {string} id - ID отчета
+ * @returns {Promise} - Promise с результатом операции
+ */
+export async function deleteInventoryReport(id) {
+  try {
+    const response = await fetch(`${API_URL}/inventory_reports?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) return true;
+      throw new Error(`Ошибка удаления отчета: ${response.statusText}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Ошибка удаления отчета с сервера:', error);
+    throw error;
+  }
+}
+

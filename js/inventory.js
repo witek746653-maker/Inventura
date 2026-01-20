@@ -579,3 +579,55 @@ export async function getInventoryReportById(id) {
     throw error;
   }
 }
+
+/**
+ * Полностью удалить инвентаризацию (отчет + сессия + записи)
+ * 
+ * @param {string} reportId - ID отчета
+ * @param {string} sessionId - ID сессии (если известен)
+ */
+export async function deleteInventoryReportAndSession(reportId, sessionId) {
+  try {
+    // 1. Удаляем отчет
+    if (reportId) {
+      // Пытаемся получить отчет, если sessionId не передан
+      if (!sessionId) {
+        try {
+          const report = await getInventoryReportById(reportId);
+          if (report) sessionId = report.session_id;
+        } catch (e) {
+          console.warn('Не удалось найти отчет перед удалением:', e);
+        }
+      }
+
+      await db.deleteInventoryReport(reportId);
+      try {
+        await supabase.deleteInventoryReport(reportId);
+      } catch (e) {
+        console.warn('Не удалось удалить отчет с сервера:', e);
+      }
+    }
+
+    // 2. Если есть ID сессии, удаляем сессию и записи
+    if (sessionId) {
+      // Удаляем записи товаров
+      await db.deleteInventoryItemsBySession(sessionId);
+      try {
+        await supabase.deleteInventoryItemsBySession(sessionId);
+      } catch (e) {
+        console.warn('Не удалось удалить записи инвентаризации с сервера:', e);
+      }
+
+      // Удаляем сессию
+      await db.deleteInventorySession(sessionId);
+      try {
+        await supabase.deleteInventorySession(sessionId);
+      } catch (e) {
+        console.warn('Не удалось удалить сессию с сервера:', e);
+      }
+    }
+  } catch (error) {
+    console.error('Ошибка полного удаления инвентаризации:', error);
+    throw error;
+  }
+}

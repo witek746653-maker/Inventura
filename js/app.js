@@ -5897,6 +5897,34 @@ async function initInventoryHistoryPage() {
  * 
  * @param {Array} reports - Массив отчетов
  */
+/**
+ * Обработка удаления отчета
+ * 
+ * @param {Object} report - Данные отчета
+ */
+async function handleDeleteReport(report) {
+  const confirmed = await showDangerConfirm(
+    'Удалить отчет?',
+    'Это действие удалит отчет и все данные этой инвентаризации. Восстановление невозможно.'
+  );
+
+  if (confirmed) {
+    try {
+      if (typeof inventory.deleteInventoryReportAndSession === 'function') {
+        await inventory.deleteInventoryReportAndSession(report.id, report.session_id);
+        showSuccess('Отчет успешно удален');
+        // Обновляем список (перезагружаем страницу истории)
+        initInventoryHistoryPage();
+      } else {
+        showError('Функция удаления недоступна. Обновите страницу.');
+      }
+    } catch (e) {
+      console.error(e);
+      showError('Не удалось удалить отчет: ' + e.message);
+    }
+  }
+}
+
 function renderHistoryList(reports) {
   const archiveSection = document.querySelector('section:last-of-type');
   if (!archiveSection) return;
@@ -5939,26 +5967,42 @@ function renderHistoryList(reports) {
     const percentSign = isPositive ? '+' : report.negative_difference > report.positive_difference ? '-' : '';
 
     const itemEl = document.createElement('div');
-    itemEl.className = 'group flex items-center justify-between p-4 active:bg-slate-50 dark:active:bg-slate-700/50 transition-colors cursor-pointer';
+    itemEl.className = 'group flex items-center justify-between p-4 active:bg-slate-50 dark:active:bg-slate-700/50 transition-colors cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0';
     itemEl.innerHTML = `
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-4 flex-1 min-w-0">
           <div class="flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 shrink-0 w-10 h-10 text-green-600 dark:text-green-400">
             <span class="material-symbols-outlined text-[20px]">check_circle</span>
           </div>
-          <div class="flex flex-col">
-            <p class="text-slate-900 dark:text-white text-base font-semibold leading-snug">${formattedDate}</p>
-            <p class="text-slate-500 dark:text-slate-400 text-sm font-normal">Позиций: <span class="text-slate-700 dark:text-slate-300 font-medium">${report.total_items || 0}</span></p>
+          <div class="flex flex-col min-w-0">
+            <p class="text-slate-900 dark:text-white text-base font-semibold leading-snug truncate">${formattedDate}</p>
+            <p class="text-slate-500 dark:text-slate-400 text-sm font-normal truncate">Позиций: <span class="text-slate-700 dark:text-slate-300 font-medium">${report.total_items || 0}</span></p>
           </div>
         </div>
-        <div class="flex flex-col items-end gap-1">
-          <span class="text-slate-400 dark:text-slate-500 text-xs">${dayDate}</span>
-          <div class="px-2 py-0.5 rounded ${percentClass} text-xs font-bold">
-            ${percentSign}${differencePercent}%
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="flex flex-col items-end gap-1">
+            <span class="text-slate-400 dark:text-slate-500 text-xs">${dayDate}</span>
+            <div class="px-2 py-0.5 rounded ${percentClass} text-xs font-bold whitespace-nowrap">
+              ${percentSign}${differencePercent}%
+            </div>
           </div>
+          <button class="delete-history-btn p-2 rounded-full text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors z-10" aria-label="Удалить">
+            <span class="material-symbols-outlined text-[20px]">delete</span>
+          </button>
         </div>
     `;
 
+    // Обработчик удаления
+    const deleteBtn = itemEl.querySelector('.delete-history-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Предотвращаем открытие деталей
+        handleDeleteReport(report);
+      });
+    }
+
+    // Обработчик открытия деталей
     itemEl.addEventListener('click', () => handleReportAction(report));
+
     archiveList.appendChild(itemEl);
   });
 }
