@@ -1,249 +1,343 @@
 <!DOCTYPE html>
 <html class="light" lang="ru">
+
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Сессия инвентаризации</title>
-<!-- PWA мета-теги -->
-<meta name="theme-color" content="#2563eb"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-<link rel="manifest" href="manifest.json"/>
-<link rel="apple-touch-icon" href="assets/icons/icon-192.svg"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/tailwind.css"/>
-<style>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Сессия инвентаризации</title>
+    <!-- PWA мета-теги -->
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.svg" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="assets/tailwind.css" />
+    <style>
         .hide-scroll::-webkit-scrollbar {
             display: none;
         }
+
         .hide-scroll {
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { 
-            -webkit-appearance: none; 
-            margin: 0; 
+
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
         }
+
         input[type=number] {
             -moz-appearance: textfield;
+            appearance: textfield;
         }
+
         body {
-            overscroll-behavior-y: none; 
+            overscroll-behavior-y: none;
         }
+
         .category-section {
-            scroll-margin-top: 120px; /* Отступ для sticky навигации */
+            scroll-margin-top: 120px;
+            /* Отступ для sticky навигации */
         }
+
         /* Ограничение названия товара 2 строками */
         .line-clamp-2 {
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
+            line-clamp: 2;
         }
+
         #floating-category-nav {
             transition: opacity 0.3s ease, transform 0.3s ease;
         }
+
         #floating-category-nav:hover {
             opacity: 1;
             transform: scale(1.02);
         }
     </style>
 </head>
-<body class="bg-background-light dark:bg-background-dark font-display antialiased text-slate-900 dark:text-slate-100 transition-colors duration-200">
-<div class="relative w-full max-w-md lg:max-w-7xl mx-auto bg-background-light dark:bg-background-dark shadow-2xl lg:shadow-none border-x border-slate-200 dark:border-slate-800 lg:border-x-0">
-<!-- Шапка с категорией и датой -->
-<div class="sticky top-0 z-50 bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors shadow-sm">
-<div class="flex items-center justify-between px-4 h-16">
-<button id="back-button" class="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-white transition-colors active:scale-95">
-<span class="material-symbols-outlined">arrow_back</span>
-</button>
-<div class="flex flex-col items-center">
-<h1 id="category-title" class="text-base font-bold leading-tight">Выберите категорию</h1>
-<span id="current-date" class="text-xs text-slate-500 dark:text-slate-400 font-medium"></span>
-</div>
-<button id="done-button" class="flex h-10 items-center justify-center px-2 active:scale-95 transition-transform">
-<span class="text-primary dark:text-blue-400 text-base font-bold">Готово</span>
-</button>
-</div>
-</div>
 
-<!-- Поиск -->
-<div class="px-4 pt-4 pb-2 space-y-3 bg-transparent z-40">
-<div class="relative group">
-<span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">
-<span class="material-symbols-outlined text-[24px]">search</span>
-</span>
-<input id="search-input" class="w-full h-12 pl-12 pr-4 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 rounded-2xl text-base font-medium placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm text-slate-900 dark:text-white transition-all" placeholder="Поиск по названию..." type="text"/>
-</div>
+<body
+    class="bg-background-light dark:bg-background-dark font-display antialiased text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    <div
+        class="relative w-full max-w-md lg:max-w-7xl mx-auto bg-background-light dark:bg-background-dark shadow-2xl lg:shadow-none border-x border-slate-200 dark:border-slate-800 lg:border-x-0">
+        <!-- Шапка с категорией и датой -->
+        <div
+            class="sticky top-0 z-50 bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors shadow-sm">
+            <div class="flex items-center justify-between px-4 h-16">
+                <button id="back-button"
+                    class="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-white transition-colors active:scale-95">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </button>
+                <div class="flex flex-col items-center">
+                    <h1 id="category-title" class="text-base font-bold leading-tight">Выберите категорию</h1>
+                    <span id="current-date" class="text-xs text-slate-500 dark:text-slate-400 font-medium"></span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button id="help-btn"
+                        class="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-white transition-colors active:scale-95">
+                        <span class="material-symbols-outlined">help</span>
+                    </button>
+                    <button id="done-button"
+                        class="flex h-10 items-center justify-center px-2 active:scale-95 transition-transform">
+                        <span class="text-primary dark:text-blue-400 text-base font-bold">Готово</span>
+                    </button>
+                </div>
+            </div>
+        </div>
 
-<!-- Кнопки выбора категории (генерируются динамически из товаров) -->
-<div class="sticky top-16 z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md -mx-4 px-4 pb-2 pt-2 border-b border-slate-200 dark:border-slate-800 transition-colors" id="category-navigation">
-<div class="flex gap-2 overflow-x-auto hide-scroll py-1">
-<!-- Кнопки категорий будут добавлены через JavaScript -->
-<button class="category-btn shrink-0 h-10 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full text-sm font-medium shadow-md border border-slate-200 dark:border-slate-700 transition-colors" data-category="">
-Все
-</button>
-</div>
-</div>
+        <!-- Поиск -->
+        <div class="px-4 pt-4 pb-2 space-y-3 bg-transparent z-40">
+            <div class="relative group">
+                <span
+                    class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">
+                    <span class="material-symbols-outlined text-[24px]">search</span>
+                </span>
+                <input id="search-input"
+                    class="w-full h-12 pl-12 pr-4 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 rounded-2xl text-base font-medium placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm text-slate-900 dark:text-white transition-all"
+                    placeholder="Поиск по названию..." type="text" />
+            </div>
 
-<!-- Плавающая навигация по категориям (компактная, генерируется динамически) -->
-<div id="floating-category-nav" class="fixed bottom-24 right-4 z-40 bg-white dark:bg-surface-dark rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-3 hidden lg:block">
-<div class="flex flex-col gap-2 max-h-[60vh] overflow-y-auto hide-scroll">
-<div class="floating-nav-title text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-200 dark:border-slate-700">
-Категории
-</div>
-<!-- Кнопки категорий будут добавлены через JavaScript -->
-</div>
-</div>
-</div>
+            <!-- Кнопки выбора категории (генерируются динамически из товаров) -->
+            <div class="sticky top-16 z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md -mx-4 px-4 pb-2 pt-2 border-b border-slate-200 dark:border-slate-800 transition-colors"
+                id="category-navigation">
+                <div class="flex gap-2 overflow-x-auto hide-scroll py-1">
+                    <!-- Кнопки категорий будут добавлены через JavaScript -->
+                    <button
+                        class="category-btn shrink-0 h-10 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full text-sm font-medium shadow-md border border-slate-200 dark:border-slate-700 transition-colors"
+                        data-category="">
+                        Все
+                    </button>
+                </div>
+            </div>
 
-<!-- Список позиций для подсчета -->
-<!-- На широких экранах используем CSS Grid для компактной сетки -->
-<!-- md (768px+): 2 колонки, lg (1024px+): 3 колонки, xl (1280px+): 4 колонки -->
-<!-- items-start - карточки прижимаются к верху, а не растягиваются -->
-<div id="items-container" class="md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-4 md:px-4 md:pt-4 md:items-start pb-24">
-<!-- Позиции будут добавлены через JavaScript -->
-</div>
+            <!-- Плавающая навигация по категориям (компактная, генерируется динамически) -->
+            <div id="floating-category-nav"
+                class="fixed bottom-24 right-4 z-40 bg-white dark:bg-surface-dark rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-3 hidden lg:block">
+                <div class="flex flex-col gap-2 max-h-[60vh] overflow-y-auto hide-scroll">
+                    <div
+                        class="floating-nav-title text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-200 dark:border-slate-700">
+                        Категории
+                    </div>
+                    <!-- Кнопки категорий будут добавлены через JavaScript -->
+                </div>
+            </div>
+        </div>
 
-<!-- Кнопка сохранения прогресса (умное позиционирование) -->
-<div id="save-btn-container" class="px-4 py-4 flex justify-center">
-<button id="save-progress-btn" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full pl-6 pr-8 py-4 shadow-xl shadow-slate-900/30 dark:shadow-black/50 flex items-center gap-3 font-bold text-base hover:scale-105 active:scale-95 transition-all ring-4 ring-white dark:ring-slate-800">
-<div class="size-8 rounded-full bg-slate-700 dark:bg-slate-200 flex items-center justify-center">
-<span class="material-symbols-outlined text-[20px]">save</span>
-</div>
-Сохранить прогресс
-</button>
-</div>
-</div>
+        <!-- Список позиций для подсчета -->
+        <!-- На широких экранах используем CSS Grid для компактной сетки -->
+        <!-- md (768px+): 2 колонки, lg (1024px+): 3 колонки, xl (1280px+): 4 колонки -->
+        <!-- items-start - карточки прижимаются к верху, а не растягиваются -->
+        <div id="items-container"
+            class="md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-4 md:px-4 md:pt-4 md:items-start pb-24">
+            <!-- Позиции будут добавлены через JavaScript -->
+        </div>
 
-<!-- Модальное окно для сохранения прогресса при выходе -->
-<div id="exit-modal" class="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center">
-<div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl">
-<h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Сохранить прогресс?</h3>
-<p class="text-sm text-slate-600 dark:text-slate-400 mb-6">Вы хотите сохранить текущий прогресс перед выходом?</p>
-<div class="flex gap-3">
-<button id="modal-save-yes" class="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
-Да
-</button>
-<button id="modal-save-no" class="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
-Нет
-</button>
-</div>
-</div>
-</div>
+        <!-- Кнопка сохранения прогресса (умное позиционирование) -->
+        <div id="save-btn-container" class="px-4 py-4 flex justify-center">
+            <button id="save-progress-btn"
+                class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full pl-6 pr-8 py-4 shadow-xl shadow-slate-900/30 dark:shadow-black/50 flex items-center gap-3 font-bold text-base hover:scale-105 active:scale-95 transition-all ring-4 ring-white dark:ring-slate-800">
+                <div class="size-8 rounded-full bg-slate-700 dark:bg-slate-200 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[20px]">save</span>
+                </div>
+                Сохранить прогресс
+            </button>
+        </div>
+    </div>
 
-<!-- Модальное окно для комментария -->
-<div id="comment-modal" class="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center">
-<div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl">
-<h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Комментарий</h3>
-<textarea id="comment-textarea" class="w-full h-32 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white resize-none focus:ring-2 focus:ring-primary focus:border-primary outline-none mb-4" placeholder="Введите комментарий..."></textarea>
-<div class="flex gap-3">
-<button id="comment-save" class="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
-Сохранить
-</button>
-<button id="comment-cancel" class="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
-Отмена
-</button>
-</div>
-</div>
-</div>
+    <!-- Модальное окно для сохранения прогресса при выходе -->
+    <div id="exit-modal" class="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm hidden items-center justify-center">
+        <div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl">
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Сохранить прогресс?</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-6">Вы хотите сохранить текущий прогресс перед
+                выходом?</p>
+            <div class="flex gap-3">
+                <button id="modal-save-yes"
+                    class="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
+                    Да
+                </button>
+                <button id="modal-save-no"
+                    class="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
+                    Нет
+                </button>
+            </div>
+        </div>
+    </div>
 
-<!-- Модальное окно для калькулятора -->
-<div id="calculator-modal" class="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center">
-<div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-xs w-full shadow-2xl">
-<h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4 text-center">Калькулятор</h3>
-<div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 mb-4">
-<div id="calc-display" class="text-right text-3xl font-bold text-slate-900 dark:text-white min-h-[48px]">0</div>
-</div>
-<div class="grid grid-cols-4 gap-2">
-<button class="calc-btn col-span-2 py-3 px-4 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-600 active:scale-95 transition-all" data-calc="clear">C</button>
-<button class="calc-btn py-3 px-4 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-600 active:scale-95 transition-all" data-calc="backspace">⌫</button>
-<button class="calc-btn py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all" data-calc="/">/</button>
-<button class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all" data-calc="7">7</button>
-<button class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all" data-calc="8">8</button>
-<button class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all" data-calc="9">9</button>
-<button class="calc-btn py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all" data-calc="*">×</button>
-<button class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all" data-calc="4">4</button>
-<button class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all" data-calc="5">5</button>
-<button class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all" data-calc="6">6</button>
-<button class="calc-btn py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all" data-calc="-">-</button>
-<button class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all" data-calc="1">1</button>
-<button class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all" data-calc="2">2</button>
-<button class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all" data-calc="3">3</button>
-<button class="calc-btn py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all" data-calc="+">+</button>
-<button class="calc-btn col-span-2 py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all" data-calc="0">0</button>
-<button class="calc-btn py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all" data-calc="=">=</button>
-</div>
-<div class="mt-4 flex gap-3">
-<button id="calc-apply" class="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
-Применить
-</button>
-<button id="calc-close" class="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
-Закрыть
-</button>
-</div>
-</div>
-</div>
+    <!-- Модальное окно для комментария -->
+    <div id="comment-modal"
+        class="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm hidden items-center justify-center">
+        <div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl">
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Комментарий</h3>
+            <textarea id="comment-textarea"
+                class="w-full h-32 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white resize-none focus:ring-2 focus:ring-primary focus:border-primary outline-none mb-4"
+                placeholder="Введите комментарий..."></textarea>
+            <div class="flex gap-3">
+                <button id="comment-save"
+                    class="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
+                    Сохранить
+                </button>
+                <button id="comment-cancel"
+                    class="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
+                    Отмена
+                </button>
+            </div>
+        </div>
+    </div>
 
-<!-- Модальное окно для добавления промежуточного значения -->
-<div id="addition-modal" class="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden items-center justify-center">
-<div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl">
-<h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4">Добавить количество</h3>
-<input id="addition-input" type="number" min="1" inputmode="numeric" class="w-full h-16 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-3xl font-bold text-center text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all" placeholder="0">
-<div class="flex gap-3 mt-5">
-<button id="addition-confirm" class="flex-1 py-3.5 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-[20px]">add</span>
-Добавить
-</button>
-<button id="addition-cancel" class="flex-1 py-3.5 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
-Отмена
-</button>
-</div>
-</div>
-</div>
+    <!-- Модальное окно для калькулятора -->
+    <div id="calculator-modal"
+        class="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm hidden items-center justify-center">
+        <div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-xs w-full shadow-2xl">
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4 text-center">Калькулятор</h3>
+            <div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 mb-4">
+                <div id="calc-display"
+                    class="text-right text-3xl font-bold text-slate-900 dark:text-white min-h-[48px]">0</div>
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+                <button
+                    class="calc-btn col-span-2 py-3 px-4 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-600 active:scale-95 transition-all"
+                    data-calc="clear">C</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-600 active:scale-95 transition-all"
+                    data-calc="backspace">⌫</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all"
+                    data-calc="/">/</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                    data-calc="7">7</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                    data-calc="8">8</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                    data-calc="9">9</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all"
+                    data-calc="*">×</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                    data-calc="4">4</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                    data-calc="5">5</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                    data-calc="6">6</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all"
+                    data-calc="-">-</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                    data-calc="1">1</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                    data-calc="2">2</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                    data-calc="3">3</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all"
+                    data-calc="+">+</button>
+                <button
+                    class="calc-btn col-span-2 py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                    data-calc="0">0</button>
+                <button
+                    class="calc-btn py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all"
+                    data-calc="=">=</button>
+            </div>
+            <div class="mt-4 flex gap-3">
+                <button id="calc-apply"
+                    class="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
+                    Применить
+                </button>
+                <button id="calc-close"
+                    class="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
+                    Закрыть
+                </button>
+            </div>
+        </div>
+    </div>
 
-<!-- Toast уведомление -->
-<div id="toast" class="fixed bottom-28 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-slate-700 text-white px-5 py-3 rounded-2xl shadow-xl shadow-slate-900/30 dark:shadow-black/50 flex items-center gap-3 opacity-0 translate-y-4 transition-all duration-300 z-[110] pointer-events-none">
-<span class="toast-icon material-symbols-outlined text-blue-400 text-[20px]">info</span>
-<span class="toast-text text-sm font-medium">Сообщение</span>
-</div>
+    <!-- Модальное окно для добавления промежуточного значения -->
+    <div id="addition-modal"
+        class="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm hidden items-center justify-center">
+        <div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl">
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4">Добавить количество</h3>
+            <input id="addition-input" type="number" min="1" inputmode="numeric"
+                class="w-full h-16 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-3xl font-bold text-center text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+                placeholder="0">
+            <div class="flex gap-3 mt-5">
+                <button id="addition-confirm"
+                    class="flex-1 py-3.5 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-[20px]">add</span>
+                    Добавить
+                </button>
+                <button id="addition-cancel"
+                    class="flex-1 py-3.5 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
+                    Отмена
+                </button>
+            </div>
+        </div>
+    </div>
 
-<!-- Модальное окно для просмотра товара (фото + название) -->
-<div id="item-preview-modal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-  <!-- Кнопка закрытия -->
-  <button id="preview-close" class="absolute top-4 right-4 size-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors z-10">
-    <span class="material-symbols-outlined text-[28px]">close</span>
-  </button>
-  
-  <!-- Контент -->
-  <div class="flex flex-col items-center gap-6 max-w-lg w-full">
-    <!-- Увеличенное фото -->
-    <div id="preview-image" class="w-64 h-64 sm:w-80 sm:h-80 rounded-3xl bg-slate-200 dark:bg-slate-700 bg-cover bg-center shadow-2xl"></div>
-    
-    <!-- Название товара -->
-    <h2 id="preview-name" class="text-xl sm:text-2xl font-bold text-white text-center leading-snug px-4"></h2>
-    
-    <!-- Единица измерения -->
-    <span id="preview-unit" class="text-base text-slate-400"></span>
-  </div>
-</div>
+    <!-- Toast уведомление -->
+    <div id="toast"
+        class="fixed bottom-28 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-slate-700 text-white px-5 py-3 rounded-2xl shadow-xl shadow-slate-900/30 dark:shadow-black/50 flex items-center gap-3 opacity-0 translate-y-4 transition-all duration-300 z-[110] pointer-events-none">
+        <span class="toast-icon material-symbols-outlined text-blue-400 text-[20px]">info</span>
+        <span class="toast-text text-sm font-medium">Сообщение</span>
+    </div>
 
-<!-- Подключение JavaScript -->
-<script type="module" src="js/inventory-session.js"></script>
-<!-- Регистрация Service Worker для PWA -->
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('Service Worker зарегистрирован:', reg.scope))
-      .catch(err => console.log('Service Worker ошибка:', err));
-  });
-}
-</script>
+    <!-- Модальное окно для просмотра товара (фото + название) -->
+    <div id="item-preview-modal"
+        class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <!-- Кнопка закрытия -->
+        <button id="preview-close"
+            class="absolute top-4 right-4 size-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors z-10">
+            <span class="material-symbols-outlined text-[28px]">close</span>
+        </button>
+
+        <!-- Контент -->
+        <div class="flex flex-col items-center gap-6 max-w-lg w-full">
+            <!-- Увеличенное фото -->
+            <div id="preview-image"
+                class="w-64 h-64 sm:w-80 sm:h-80 rounded-3xl bg-slate-200 dark:bg-slate-700 bg-cover bg-center shadow-2xl">
+            </div>
+
+            <!-- Название товара -->
+            <h2 id="preview-name" class="text-xl sm:text-2xl font-bold text-white text-center leading-snug px-4"></h2>
+
+            <!-- Единица измерения -->
+            <span id="preview-unit" class="text-base text-slate-400"></span>
+        </div>
+    </div>
+
+    <!-- Подключение JavaScript -->
+    <script type="module" src="js/inventory-session.js"></script>
+    <!-- Регистрация Service Worker для PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker зарегистрирован:', reg.scope))
+                    .catch(err => console.log('Service Worker ошибка:', err));
+            });
+        }
+    </script>
 </body>
+
 </html>

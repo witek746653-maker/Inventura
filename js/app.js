@@ -11,7 +11,7 @@ import { setupAutoSync } from './sync.js';
 import * as items from './items.js';
 import * as inventory from './inventory.js';
 import * as supabase from './supabase.js';
-import { showConfirm, showDangerConfirm, showAlert } from './modal.js';
+import { showConfirm, showDangerConfirm, showAlert, showModal, closeModal } from './modal.js';
 
 // Состояние приложения
 const appState = {
@@ -48,6 +48,9 @@ export async function initApp() {
 
     // Настраиваем навигацию
     setupNavigation();
+
+    // Настраиваем кнопки справки
+    setupHelpButtons();
 
     appState.initialized = true;
     console.log('Приложение инициализировано');
@@ -6165,7 +6168,8 @@ function showManagementHelpModal() {
 
   const modal = document.createElement('div');
   modal.id = 'management-help-modal';
-  modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
+  modal.className = 'fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
+  modal.style.zIndex = '9999';
   modal.innerHTML = `
     <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
       <div class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
@@ -6377,7 +6381,8 @@ function showHelpModal() {
 
   const modal = document.createElement('div');
   modal.id = 'help-modal';
-  modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
+  modal.className = 'fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
+  modal.style.zIndex = '9999';
   modal.innerHTML = `
     <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
       <div class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
@@ -6481,6 +6486,11 @@ async function initInventoryHistoryPage() {
  * 
  * @param {Array} reports - Массив отчетов
  */
+/**
+ * Отобразить список истории отчетов
+ * 
+ * @param {Array} reports - Массив отчетов
+ */
 function renderHistoryList(reports) {
   const archiveSection = document.querySelector('section:last-of-type');
   if (!archiveSection) return;
@@ -6498,15 +6508,19 @@ function renderHistoryList(reports) {
     return;
   }
 
-  archiveList.innerHTML = reports.map(report => {
+  // Очищаем и создаем элементы заново, чтобы навесить обработчики
+  archiveList.innerHTML = '';
+
+  reports.forEach(report => {
     const reportDate = new Date(report.date || report.created_at);
     const options = { month: 'long', year: 'numeric' };
     const formattedDate = reportDate.toLocaleDateString('ru-RU', options);
     const dayDate = reportDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
-    // Вычисляем процент изменения (упрощенная версия)
+    // Вычисляем процент изменения
+    const totalItems = report.total_items || 1;
     const differencePercent = report.items_with_difference > 0
-      ? ((report.items_with_difference / report.total_items) * 100).toFixed(1)
+      ? ((report.items_with_difference / totalItems) * 100).toFixed(1)
       : '0.0';
 
     const isPositive = report.positive_difference > report.negative_difference;
@@ -6518,8 +6532,9 @@ function renderHistoryList(reports) {
 
     const percentSign = isPositive ? '+' : report.negative_difference > report.positive_difference ? '-' : '';
 
-    return `
-      <div class="group flex items-center justify-between p-4 active:bg-slate-50 dark:active:bg-slate-700/50 transition-colors cursor-pointer">
+    const itemEl = document.createElement('div');
+    itemEl.className = 'group flex items-center justify-between p-4 active:bg-slate-50 dark:active:bg-slate-700/50 transition-colors cursor-pointer';
+    itemEl.innerHTML = `
         <div class="flex items-center gap-4">
           <div class="flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 shrink-0 w-10 h-10 text-green-600 dark:text-green-400">
             <span class="material-symbols-outlined text-[20px]">check_circle</span>
@@ -6535,10 +6550,173 @@ function renderHistoryList(reports) {
             ${percentSign}${differencePercent}%
           </div>
         </div>
-      </div>
     `;
-  }).join('');
+
+    itemEl.addEventListener('click', () => handleReportAction(report));
+    archiveList.appendChild(itemEl);
+  });
 }
+
+/**
+ * Обработка действий с отчетом (модальное окно)
+ * 
+ * @param {Object} report - Данные отчета
+ */
+function handleReportAction(report) {
+  const reportDate = new Date(report.date || report.created_at);
+  const options = { day: 'numeric', month: 'long', year: 'numeric' };
+  const formattedDate = reportDate.toLocaleDateString('ru-RU', options);
+
+  showModal({
+    title: 'Управление отчетом',
+    message: `Отчет от ${formattedDate}\nВыберите действие с этим документом.`,
+    buttons: [
+      {
+        text: 'Сохранить',
+        primary: true,
+        onClick: () => exportReportToExcel(report)
+      },
+      {
+        text: 'Отправить',
+        primary: true,
+        onClick: () => shareReport(report)
+      },
+      {
+        text: 'Просмотреть',
+        primary: false,
+        onClick: () => viewReportDetails(report)
+      }
+    ]
+  });
+}
+
+/**
+ * Экспорт отчета в Excel
+ * 
+ * @param {Object} report - Данные отчета
+ */
+function exportReportToExcel(report) {
+  try {
+    if (typeof XLSX === 'undefined') {
+      showAlert('Библиотека Excel не загружена. Проверьте подключение к интернету.');
+      return;
+    }
+
+    const reportData = report.items.map(item => ({
+      'Товар': item.item_name,
+      'Количество': item.quantity,
+      'Предыдущее': item.previous_quantity || 0,
+      'Разница': item.difference || 0,
+      'Комментарий': item.comment || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(reportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Отчет");
+
+    const fileName = `Инвентаризация_${report.date || 'отчет'}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  } catch (error) {
+    console.error('Ошибка экспорта:', error);
+    showAlert('Не удалось сохранить файл Excel.');
+  }
+}
+
+/**
+ * Отправить отчет
+ * 
+ * @param {Object} report - Данные отчета
+ */
+async function shareReport(report) {
+  const reportDate = new Date(report.date || report.created_at).toLocaleDateString('ru-RU');
+  const text = `Отчет по инвентаризации от ${reportDate}\nПозиций: ${report.total_items}\nРасхождений: ${report.items_with_difference}`;
+
+  // Закрываем модалку сразу, чтобы она не "висела" на фоне выбора приложения
+  closeModal();
+
+  if (navigator.share) {
+    try {
+      // Не ждем (await), чтобы не блокировать поток, если системное окно долго открыто
+      navigator.share({
+        title: 'Отчет по инвентаризации',
+        text: text,
+      }).catch(err => {
+        if (err.name !== 'AbortError') console.error('Share error:', err);
+      });
+      return;
+    } catch (error) {
+      console.warn('Ошибка Web Share:', error);
+    }
+  }
+
+  // Фолбэк на буфер обмена
+  try {
+    await navigator.clipboard.writeText(text);
+    showAlert('Текст отчета скопирован', 'Готово');
+  } catch (err) {
+    showAlert(text, 'Текст отчета');
+  }
+}
+
+/**
+ * Просмотреть детали отчета
+ * 
+ * @param {Object} report - Данные отчета
+ */
+function viewReportDetails(report) {
+  const reportDate = new Date(report.date || report.created_at).toLocaleDateString('ru-RU');
+
+  // Компактная разметка с принудительной шириной
+  let html = `<div class="w-full space-y-4">
+      <div class="grid grid-cols-2 gap-2 w-full">
+        <div class="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700 w-full">
+          <p class="text-[9px] uppercase font-black text-slate-400 mb-0.5">Всего</p>
+          <p class="text-lg font-black text-slate-900 dark:text-white leading-none">${report.total_items}</p>
+        </div>
+        <div class="bg-amber-50/50 dark:bg-amber-900/10 p-2.5 rounded-xl border border-amber-100/50 dark:border-amber-900/30 w-full">
+          <p class="text-[9px] uppercase font-black text-amber-500 mb-0.5">Разница</p>
+          <p class="text-lg font-black text-amber-600 dark:text-amber-400 leading-none">${report.items_with_difference}</p>
+        </div>
+        <div class="bg-green-50/50 dark:bg-green-900/20 p-2.5 rounded-xl border border-green-100/50 dark:border-green-900/30 w-full">
+          <p class="text-[9px] uppercase font-black text-green-500 mb-0.5">Излишки</p>
+          <p class="text-lg font-black text-green-600 dark:text-green-400 leading-none">${report.positive_difference}</p>
+        </div>
+        <div class="bg-red-50/50 dark:bg-red-900/20 p-2.5 rounded-xl border border-red-100/50 dark:border-red-900/30 w-full">
+          <p class="text-[9px] uppercase font-black text-red-500 mb-0.5">Недостачи</p>
+          <p class="text-lg font-black text-red-600 dark:text-red-400 leading-none">${report.negative_difference}</p>
+        </div>
+      </div>
+      <div class="space-y-2 w-full">
+        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-tighter flex items-center gap-1.5 ml-1">
+          <span class="material-symbols-outlined text-[14px]">list_alt</span>
+          Список расхождений
+        </h4>
+        <div class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-800/20 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden w-full">`;
+
+  const diffItems = report.items.filter(i => i.difference !== 0);
+
+  if (diffItems.length > 0) {
+    diffItems.forEach(i => {
+      const colorClass = i.difference > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+      html += `
+        <div class="px-3 py-2 flex items-start gap-3 w-full border-b border-slate-50 dark:border-slate-800/50 last:border-0">
+          <div class="flex-1 min-w-0">
+            <p class="text-[12px] font-medium text-slate-700 dark:text-slate-300 leading-tight break-all">${i.item_name}</p>
+          </div>
+          <div class="shrink-0 text-right pt-0.5">
+            <p class="text-[13px] font-black ${colorClass} whitespace-nowrap">${i.difference > 0 ? '+' : ''}${i.difference}</p>
+          </div>
+        </div>`;
+    });
+  } else {
+    html += `<p class="py-4 text-center text-slate-400 text-xs italic">Расхождений нет</p>`;
+  }
+
+  html += `</div></div></div>`;
+
+  return showAlert(html, `Отчет от ${reportDate}`);
+}
+
 
 /**
  * Показать сообщение об ошибке
@@ -6558,7 +6736,8 @@ async function showError(message) {
  */
 function showSuccess(message) {
   console.log(message);
-  // Здесь можно добавить отображение успешного сообщения в UI
+  // Используем алерт, так как отдельного тоста пока нет
+  showAlert(message, 'Успешно');
 }
 
 // Инициализируем приложение при загрузке страницы
@@ -6568,5 +6747,262 @@ if (document.readyState === 'loading') {
   initApp();
 }
 
+/**
+ * Настройка кнопок справки на всех страницах
+ */
+function setupHelpButtons() {
+  const helpBtn = document.getElementById('help-btn');
+  if (helpBtn) {
+    // Удаляем старые обработчики, если есть
+    helpBtn.replaceWith(helpBtn.cloneNode(true));
+    const newHelpBtn = document.getElementById('help-btn');
+    newHelpBtn.addEventListener('click', () => {
+      showPageHelp();
+    });
+  }
+}
+
+/**
+ * Показать модальное окно справки для текущей страницы
+ */
+function showPageHelp() {
+  const page = getCurrentPage();
+  console.log('Показ справки для страницы:', page);
+
+  // Для страниц с уже существующей логикой
+  if (page === 'items-management') {
+    if (typeof showManagementHelpModal === 'function') {
+      showManagementHelpModal();
+      return;
+    }
+  }
+
+  if (page === 'items-import') {
+    if (typeof showHelpModal === 'function') {
+      showHelpModal();
+      return;
+    }
+  }
+
+  let title = 'Справка';
+  let content = '';
+
+  switch (page) {
+    case 'inventory':
+      title = 'Главная панель';
+      content = `
+        <div class="space-y-4">
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">analytics</span>
+              Обзор инвентаризации
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Здесь отображается статус активной сессии. Вы можете увидеть прогресс подсчета и обнаруженные расхождения.</p>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">play_circle</span>
+              Управление сессией
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Нажмите <b>"Начать"</b> для новой инвентаризации или <b>"Продолжить"</b>, если работа уже начата.</p>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">history</span>
+              История
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Ниже представлен список последних завершенных инвентаризаций. Нажмите на любой отчет для просмотра деталей.</p>
+          </div>
+        </div>
+      `;
+      break;
+    case 'items':
+      title = 'База товаров';
+      content = `
+        <div class="space-y-4">
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">search</span>
+              Поиск и фильтрация
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Используйте строку поиска для нахождения товара по названию или SKU. Кнопки выше позволяют фильтровать список по категориям.</p>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">add_circle</span>
+              Добавление товара
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Синяя плавающая кнопка <b>"+"</b> внизу справа открывает форму создания нового товара в системе.</p>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">info</span>
+              Управление
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Нажмите на карточку любого товара, чтобы перейти в режим редактирования или посмотреть историю замеров.</p>
+          </div>
+        </div>
+      `;
+      break;
+    case 'inventory-history':
+      title = 'Статистика и отчеты';
+      content = `
+        <div class="space-y-4">
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">show_chart</span>
+              Динамика остатков
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">График показывает общее изменение количества товаров по месяцам. Рост или падение отображается в процентах.</p>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">folder_zip</span>
+              Архив отчетов
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Все завершенные инвентаризации хранятся здесь. Вы можете открыть любой старый отчет для анализа расхождений.</p>
+          </div>
+        </div>
+      `;
+      break;
+    case 'item-details':
+      title = 'Инфо о товаре';
+      content = `
+        <div class="space-y-4">
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">edit</span>
+              Режим правки
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Нажмите на значок карандаша вверху, чтобы изменить фото, название, SKU или место хранения товара.</p>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-green-600">calculate</span>
+              Текущий замер
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">В центральном блоке отображается количество, зафиксированное в текущей (или последней) сессии, и его отличие от предыдущего замера.</p>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-red-600">delete</span>
+              Удаление
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Кнопка внизу позволяет безвозвратно удалить товар из базы данных. Будьте осторожны!</p>
+          </div>
+        </div>
+      `;
+      break;
+    case 'inventory-session':
+      title = 'Процесс инвентаризации';
+      content = `
+        <div class="space-y-4">
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">filter_list</span>
+              Категории и поиск
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Выбирайте категорию в верхней ленте или воспользуйтесь плавающим меню справа. Кнопка <b>"Все"</b> сбрасывает все фильтры.</p>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">add_box</span>
+              Ввод данных
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Используйте <b>"+"</b> и <b>"-"</b> для изменения количества. Нажмите на число, чтобы открыть калькулятор или добавить промежуточное значение.</p>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">save</span>
+              Сохранение
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Приложение сохраняет данные автоматически каждые 30 сек. Также вы можете нажать <b>"Сохранить прогресс"</b> вручную перед выходом.</p>
+          </div>
+        </div>
+      `;
+      break;
+  }
+
+  if (content) {
+    createHelpModal(title, content);
+  } else {
+    // Если контент не задан, показываем общую справку
+    createHelpModal('Помощь', '<p class="text-sm text-slate-600 dark:text-slate-400">На этой странице пока нет подробного описания. Используйте навигацию меню для перехода между разделами.</p>');
+  }
+}
+
+/**
+ * Создание и отображение модального окна справки
+ */
+function createHelpModal(title, htmlContent) {
+  // Проверяем, не открыто ли уже модальное окно
+  const existingModal = document.getElementById('global-help-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  const modal = document.createElement('div');
+  modal.id = 'global-help-modal';
+  modal.className = 'fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 opacity-0 transition-opacity duration-300';
+  modal.style.zIndex = '9999';
+  modal.innerHTML = `
+    <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col transform scale-95 transition-transform duration-300">
+      <div class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+        <div class="flex items-center gap-3">
+          <div class="size-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-primary">
+            <span class="material-symbols-outlined">help</span>
+          </div>
+          <h2 class="text-xl font-bold text-slate-900 dark:text-white">${title}</h2>
+        </div>
+        <button id="close-global-help" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-400">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        ${htmlContent}
+      </div>
+      <div class="p-6 border-t border-slate-200 dark:border-slate-700">
+        <button id="close-global-help-btn" class="w-full bg-primary hover:bg-blue-600 text-white font-bold py-4 rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-blue-500/25">
+          Понятно
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Анимация появления
+  requestAnimationFrame(() => {
+    modal.classList.add('opacity-100');
+    modal.querySelector('div').classList.remove('scale-95');
+    modal.querySelector('div').classList.add('scale-100');
+  });
+
+  // Обработчики закрытия
+  const closeModal = () => {
+    modal.classList.remove('opacity-100');
+    modal.querySelector('div').classList.add('scale-95');
+    setTimeout(() => modal.remove(), 300);
+  };
+
+  modal.querySelector('#close-global-help').addEventListener('click', closeModal);
+  modal.querySelector('#close-global-help-btn').addEventListener('click', closeModal);
+
+  // Закрытие по клику вне модального окна
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  // Закрытие по Escape
+  const handleEscape = (e) => {
+    if (e.key === 'Escape') {
+      closeModal();
+      document.removeEventListener('keydown', handleEscape);
+    }
+  };
+  document.addEventListener('keydown', handleEscape);
+}
+
 // Экспортируем функции для использования в других модулях
-export { navigateTo, showError, showSuccess };
+export { navigateTo, showError, showSuccess, showPageHelp };
+

@@ -5,7 +5,7 @@
  * со страницей подсчета товаров во время инвентаризации.
  */
 
-import { initApp } from './app.js';
+import { initApp, showPageHelp } from './app.js';
 import * as items from './items.js';
 import * as inventory from './inventory.js';
 import { showAlert } from './modal.js';
@@ -287,6 +287,14 @@ function setupEventHandlers() {
   const doneBtn = document.getElementById('done-button');
   if (doneBtn) {
     doneBtn.addEventListener('click', handleDone);
+  }
+
+  // Кнопка справки
+  const helpBtn = document.getElementById('help-btn');
+  if (helpBtn) {
+    helpBtn.addEventListener('click', () => {
+      showPageHelp();
+    });
   }
 
   // Поиск

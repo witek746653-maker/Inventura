@@ -8,6 +8,7 @@ let titleElement = null;
 let messageElement = null;
 let buttonsContainer = null;
 let resolvePromise = null;
+let closeTimeout = null; // Таймер для плавного закрытия
 
 /**
  * Инициализация модального окна (создание DOM элементов)
@@ -17,11 +18,11 @@ function initModal() {
 
     // HTML структура модального окна
     const modalHTML = `
-    <div id="custom-modal" class="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm hidden items-center justify-center flex opacity-0 transition-opacity duration-200">
-        <div class="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl transform scale-95 transition-all duration-200">
-            <h3 id="custom-modal-title" class="text-xl font-bold text-slate-900 dark:text-white mb-2"></h3>
-            <div id="custom-modal-message" class="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed"></div>
-            <div id="custom-modal-buttons" class="flex gap-3">
+    <div id="custom-modal" class="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm hidden items-center justify-center opacity-0 transition-opacity duration-200 p-4">
+        <div class="bg-white dark:bg-surface-dark rounded-3xl p-4 w-full max-w-md shadow-2xl transform scale-95 transition-all duration-200 flex flex-col max-h-[90vh]">
+            <h3 id="custom-modal-title" class="text-xl font-black text-slate-900 dark:text-white mb-3 leading-tight"></h3>
+            <div id="custom-modal-message" class="text-[14px] text-slate-600 dark:text-slate-400 mb-4 leading-relaxed overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar"></div>
+            <div id="custom-modal-buttons" class="flex flex-col gap-2 mt-auto">
                 <!-- Кнопки будут добавлены динамически -->
             </div>
         </div>
@@ -43,60 +44,93 @@ function initModal() {
  * @param {string} options.message - Текст сообщения
  * @param {Array} options.buttons - Массив кнопок [{text, primary, onClick}]
  */
-function showModal({ title, message, buttons = [] }) {
+export function showModal({ title, message, buttons = [] }) {
+    // Если планировалось закрытие — отменяем его
+    if (closeTimeout) {
+        clearTimeout(closeTimeout);
+        closeTimeout = null;
+    }
+
     initModal();
 
     // Установка текста
     titleElement.textContent = title;
     // Поддержка переносов строк
-    messageElement.innerHTML = message.replace(/\n/g, '<br>');
+    messageElement.innerHTML = message;
 
     // Очистка кнопок
     buttonsContainer.innerHTML = '';
 
+    // Определяем расположение кнопок: 1-2 кнопки — в ряд, 3 и более — в колонку
+    if (buttons.length <= 2) {
+        buttonsContainer.className = "flex gap-3";
+    } else {
+        buttonsContainer.className = "flex flex-col gap-2";
+    }
+
     // Создание кнопок
-    buttons.forEach((btn, index) => {
+    buttons.forEach((btn) => {
         const button = document.createElement('button');
         button.textContent = btn.text;
 
         // Стилизация кнопок
-        const baseClasses = "flex-1 py-3 px-4 rounded-xl font-bold active:scale-95 transition-all";
+        const baseClasses = "flex-1 py-3 px-4 rounded-xl font-bold active:scale-95 transition-all text-sm";
         const primaryClasses = "bg-primary text-white hover:bg-blue-600 shadow-md shadow-blue-500/20";
         const secondaryClasses = "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600";
         const dangerClasses = "bg-red-500 text-white hover:bg-red-600 shadow-md shadow-red-500/20";
 
         button.className = `${baseClasses} ${btn.danger ? dangerClasses : (btn.primary ? primaryClasses : secondaryClasses)}`;
 
-        button.onclick = () => {
-            closeModal();
-            if (btn.onClick) btn.onClick();
+        button.onclick = async () => {
+            // Если есть действие — выполняем его и ждем (важно для navigator.share и алертов)
+            if (btn.onClick) {
+                await btn.onClick();
+            }
+
+            // Если после выполнения действия заголовок не изменился, значит новое окно не открылось поверх — тогда закрываем
+            if (titleElement.textContent === title) {
+                closeModal();
+            }
         };
 
         buttonsContainer.appendChild(button);
     });
 
     // Показать окно с анимацией
+    const isAlreadyVisible = !modalElement.classList.contains('hidden') && !modalElement.classList.contains('opacity-0');
+
     modalElement.classList.remove('hidden');
-    // Небольшая задержка для срабатывания transition
-    requestAnimationFrame(() => {
+    modalElement.classList.add('flex');
+
+    if (!isAlreadyVisible) {
+        // Небольшая задержка для плавного появления, если оно было скрыто
+        requestAnimationFrame(() => {
+            modalElement.classList.remove('opacity-0');
+            modalElement.querySelector('div').classList.remove('scale-95');
+            modalElement.querySelector('div').classList.add('scale-100');
+        });
+    } else {
+        // Если окно уже было на экране (переход), просто сбрасываем стили если они вдруг были в процессе исчезновения
         modalElement.classList.remove('opacity-0');
         modalElement.querySelector('div').classList.remove('scale-95');
         modalElement.querySelector('div').classList.add('scale-100');
-    });
+    }
 }
 
 /**
  * Закрыть модальное окно
  */
-function closeModal() {
-    if (!modalElement) return;
+export function closeModal() {
+    if (!modalElement || modalElement.classList.contains('hidden')) return;
 
     modalElement.classList.add('opacity-0');
     modalElement.querySelector('div').classList.remove('scale-100');
     modalElement.querySelector('div').classList.add('scale-95');
 
-    setTimeout(() => {
+    closeTimeout = setTimeout(() => {
         modalElement.classList.add('hidden');
+        modalElement.classList.remove('flex');
+        closeTimeout = null;
     }, 200);
 }
 
