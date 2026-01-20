@@ -2828,10 +2828,10 @@ function parseExcelFile(file) {
             category: String(row[4] || '').trim(),
             unit: String(row[5] || '').trim(),
             location: String(row[6] || '').trim(),
-            // Количество может быть пустым -> null
+            // Количество может быть пустым -> 0
             quantity: (row[7] !== null && row[7] !== undefined && row[7] !== '')
               ? Number(row[7])
-              : null,
+              : 0,
             _excelRowNumber: i + 1 // Номер строки в Excel (1-based)
           };
 
@@ -3030,6 +3030,10 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
 
     const sku = String(data.sku || '').trim();
     const name = String(data.name || '').trim();
+    const quantityValue = data.quantity;
+    const normalizedQuantity = (quantityValue === null || quantityValue === undefined || quantityValue === '')
+      ? 0
+      : Number(quantityValue);
 
     // 1. Валидация Артикула (обязателен)
     if (!sku) {
@@ -3116,7 +3120,7 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
       category: data.category || null,
       unit: data.unit || 'шт',
       location: data.location || null,
-      quantity: data.quantity !== undefined ? data.quantity : null,
+      quantity: Number.isFinite(normalizedQuantity) ? normalizedQuantity : 0,
       image_url: data.image_url || null,
       _extractedImage: data._extractedImage || null,
       _excelRow: excelRow
@@ -5785,7 +5789,7 @@ function showHelpModal() {
         <div>
           <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-2">Как импортировать данные</h3>
           <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-            Вы можете импортировать товары из файлов Excel или CSV. Поддерживаемые форматы: .xlsx, .xls, .csv
+            Вы можете импортировать товары из файлов Excel или CSV. Поддерживаемые форматы: .xlsx, .xls, .csv. Для корректнойработы с Exсel файлами необходимо, чтобы таблица имела 8 колонок, расположенных в следущем порядке: Артикул, Фото, Название, Описание, Категория, Единицы измерения, Место хранения, Текущее количество.
           </p>
         </div>
         <div>
