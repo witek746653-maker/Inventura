@@ -489,6 +489,7 @@ function showCompleteModal(sessionId) {
 
   // Обработчик кнопки "Сформировать отчет"
   const yesButton = document.getElementById('complete-yes');
+  const noReportButton = document.getElementById('complete-no-report');
   const cancelButton = document.getElementById('complete-cancel');
 
   const handleYes = async () => {
@@ -520,6 +521,24 @@ function showCompleteModal(sessionId) {
     modal.classList.remove('flex');
   };
 
+  const handleNoReport = async () => {
+    try {
+      await inventory.completeInventorySession(sessionId);
+
+      showSuccess('Инвентаризация завершена без отчета');
+
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('Ошибка завершения инвентаризации без отчета:', error);
+      showError('Не удалось завершить инвентаризацию без отчета');
+    }
+  };
+
   // Удаляем старые обработчики и добавляем новые
   const newYesButton = yesButton.cloneNode(true);
   yesButton.parentNode.replaceChild(newYesButton, yesButton);
@@ -528,6 +547,10 @@ function showCompleteModal(sessionId) {
   const newCancelButton = cancelButton.cloneNode(true);
   cancelButton.parentNode.replaceChild(newCancelButton, cancelButton);
   newCancelButton.addEventListener('click', handleCancel);
+
+  const newNoReportButton = noReportButton.cloneNode(true);
+  noReportButton.parentNode.replaceChild(newNoReportButton, noReportButton);
+  newNoReportButton.addEventListener('click', handleNoReport);
 }
 
 /**

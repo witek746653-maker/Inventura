@@ -217,13 +217,17 @@
             <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Завершить инвентаризацию?</h3>
             <p class="text-sm text-slate-600 dark:text-slate-400 mb-6">Вы хотите завершить текущую инвентаризацию и
                 сформировать отчет?</p>
-            <div class="flex gap-3">
+            <div class="flex flex-col gap-3">
                 <button id="complete-yes"
-                    class="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
+                    class="w-full py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 active:scale-95 transition-all">
                     Сформировать отчет
                 </button>
+                <button id="complete-no-report"
+                    class="w-full py-3 px-4 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 rounded-xl font-bold hover:bg-amber-200 dark:hover:bg-amber-900/50 active:scale-95 transition-all">
+                    Завершить без сохранения
+                </button>
                 <button id="complete-cancel"
-                    class="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
+                    class="w-full py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
                     Отмена
                 </button>
             </div>
