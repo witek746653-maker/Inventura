@@ -14,7 +14,8 @@ const API_URL = `${supabaseConfig.url}/rest/v1`;
 const getHeaders = () => ({
   'Content-Type': 'application/json',
   'apikey': supabaseConfig.anonKey,
-  'Authorization': `Bearer ${supabaseConfig.anonKey}`
+  'Authorization': `Bearer ${supabaseConfig.anonKey}`,
+  'Prefer': 'return=representation'
 });
 
 /**

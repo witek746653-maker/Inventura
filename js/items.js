@@ -17,7 +17,7 @@ import { STORES } from './db.js';
  */
 function generateId() {
   // Простая генерация UUID (для продакшена лучше использовать библиотеку)
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -42,7 +42,7 @@ export async function createItem(itemData) {
   if (!itemData.name || itemData.name.trim() === '') {
     throw new Error('Название товара обязательно');
   }
-  
+
   // Создаем объект товара с ID
   const parsedCurrentQuantity = Number(itemData.current_quantity ?? itemData.quantity ?? 0);
   const item = {
@@ -56,11 +56,11 @@ export async function createItem(itemData) {
     description: itemData.description || null,
     current_quantity: Number.isFinite(parsedCurrentQuantity) ? parsedCurrentQuantity : 0
   };
-  
+
   try {
     // Сначала сохраняем локально
     const localItem = await db.addItem(item);
-    
+
     // Пытаемся синхронизировать с сервером (если есть интернет)
     // Проверяем наличие интернета перед попыткой синхронизации
     if (navigator.onLine) {
@@ -102,28 +102,28 @@ export async function getAllItems() {
   try {
     // Получаем локальные товары
     const localItems = await db.getAllItems();
-    
+
     // Пытаемся получить товары с сервера (если есть интернет)
     try {
       const serverItems = await supabase.fetchAllItems();
-      
+
       // Объединяем данные: приоритет у ЛОКАЛЬНЫХ несинхронизированных изменений
       const itemsMap = new Map();
-      
+
       // Сначала добавляем серверные товары (как базу)
       serverItems.forEach(item => {
         itemsMap.set(item.id, { ...item, synced: true });
       });
-      
+
       // Затем добавляем/обновляем локальными товарами
       // Локальные товары с synced: false имеют приоритет (не перезаписываются серверными)
       localItems.forEach(item => {
         const existingItem = itemsMap.get(item.id);
-        
+
         // Если товара нет на сервере, добавляем локальный
         if (!existingItem) {
           itemsMap.set(item.id, item);
-        } 
+        }
         // Если товар есть локально и НЕ синхронизирован, используем локальную версию
         // Это важно для сохранения локальных изменений (например, новых image_url)
         else if (!item.synced) {
@@ -136,21 +136,21 @@ export async function getAllItems() {
         }
         // Если товар синхронизирован, оставляем серверную версию
       });
-      
+
       // Обновляем локальную базу данными с сервера, НО НЕ перезаписываем несинхронизированные изменения
       for (const item of serverItems) {
         const localItem = localItems.find(li => li.id === item.id);
-        
+
         // Обновляем только если товар синхронизирован или его нет локально
         if (!localItem || localItem.synced) {
           await db.updateItem(item.id, { ...item, synced: true }).catch(() => {
             // Если товара нет локально, добавляем его
-            db.addItem({ ...item, synced: true }).catch(() => {});
+            db.addItem({ ...item, synced: true }).catch(() => { });
           });
         }
         // Если товар не синхронизирован, НЕ перезаписываем его серверными данными
       }
-      
+
       return Array.from(itemsMap.values());
     } catch (syncError) {
       // Если синхронизация не удалась, возвращаем только локальные данные
@@ -173,7 +173,7 @@ export async function getItemById(id) {
   try {
     // Сначала проверяем локальную базу
     let item = await db.getItemById(id);
-    
+
     // Если товар не найден локально или не синхронизирован, пытаемся получить с сервера
     if (!item || !item.synced) {
       try {
@@ -191,7 +191,7 @@ export async function getItemById(id) {
         console.warn('Не удалось получить товар с сервера:', syncError);
       }
     }
-    
+
     return item;
   } catch (error) {
     console.error('Ошибка получения товара:', error);
@@ -210,20 +210,22 @@ export async function updateItem(id, updates) {
   try {
     // Обновляем локально
     const localItem = await db.updateItem(id, updates);
-    
+
     // Пытаемся синхронизировать с сервером
     try {
       const serverItem = await supabase.updateItem(id, updates);
-      
+
       // Важно: если мы обновляем image_url, убеждаемся, что он сохранился
       // Объединяем серверный ответ с локальными изменениями
       const mergedItem = {
         ...serverItem,
         // Если обновляли image_url, сохраняем его (даже если сервер вернул старую версию)
         ...(updates.image_url && { image_url: updates.image_url }),
+        // Сохраняем введенный остаток, чтобы он не затерся сервером при merge
+        ...('current_quantity' in updates && { current_quantity: updates.current_quantity }),
         synced: true
       };
-      
+
       // Обновляем локальную запись объединенными данными
       await db.updateItem(id, mergedItem);
       return mergedItem;
@@ -248,7 +250,7 @@ export async function deleteItem(id) {
   try {
     // Удаляем локально
     await db.deleteItem(id);
-    
+
     // Пытаемся удалить с сервера
     try {
       await supabase.deleteItem(id);
@@ -256,7 +258,7 @@ export async function deleteItem(id) {
       console.warn('Не удалось удалить товар с сервера:', syncError);
       // В реальном приложении можно добавить в очередь на удаление
     }
-    
+
     return true;
   } catch (error) {
     console.error('Ошибка удаления товара:', error);
@@ -274,20 +276,20 @@ export async function searchItems(query) {
   try {
     const allItems = await getAllItems();
     const lowerQuery = query.toLowerCase().trim();
-    
+
     if (!lowerQuery) {
       return allItems;
     }
-    
+
     // Фильтруем товары по названию, категории, артикулу
     return allItems.filter(item => {
       const name = (item.name || '').toLowerCase();
       const category = (item.category || '').toLowerCase();
       const sku = (item.sku || '').toLowerCase();
-      
-      return name.includes(lowerQuery) || 
-             category.includes(lowerQuery) || 
-             sku.includes(lowerQuery);
+
+      return name.includes(lowerQuery) ||
+        category.includes(lowerQuery) ||
+        sku.includes(lowerQuery);
     });
   } catch (error) {
     console.error('Ошибка поиска товаров:', error);
@@ -336,13 +338,13 @@ export async function getAllCategories() {
   try {
     const allItems = await getAllItems();
     const categories = new Set();
-    
+
     allItems.forEach(item => {
       if (item.category) {
         categories.add(item.category);
       }
     });
-    
+
     return Array.from(categories).sort();
   } catch (error) {
     console.error('Ошибка получения категорий:', error);
@@ -359,13 +361,13 @@ export async function getAllLocations() {
   try {
     const allItems = await getAllItems();
     const locations = new Set();
-    
+
     allItems.forEach(item => {
       if (item.location) {
         locations.add(item.location);
       }
     });
-    
+
     return Array.from(locations).sort();
   } catch (error) {
     console.error('Ошибка получения мест хранения:', error);

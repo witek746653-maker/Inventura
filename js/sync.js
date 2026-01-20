@@ -250,7 +250,15 @@ export async function pullFromServer() {
       try {
         const localItem = await db.getItemById(item.id);
         if (localItem) {
-          await db.updateItem(item.id, { ...item, synced: true });
+          // Если локальный товар не синхронизирован, не перезаписываем его серверной версией полностью,
+          // чтобы не потерять локальные правки (например, current_quantity)
+          if (localItem.synced === false) {
+            console.log(`Пропуск обновления ${item.id} - есть несинхронизированные локальные изменения`);
+            // Можно сделать merge: {...item, ...localItem, synced: false} если хотим обновить только новые поля
+            await db.updateItem(item.id, { ...item, ...localItem, synced: false });
+          } else {
+            await db.updateItem(item.id, { ...item, synced: true });
+          }
         } else {
           await db.addItem({ ...item, synced: true });
         }

@@ -1648,7 +1648,7 @@ function renderItemDetails(item) {
   // Текущий остаток
   const quantityInput = document.getElementById('item-quantity');
   if (quantityInput) {
-    quantityInput.value = item.quantity || 0;
+    quantityInput.value = getItemQuantityValue(item);
   }
 
   // Статистика инвентаризации (Предыдущий замер и Разница)
@@ -1676,7 +1676,7 @@ function renderItemDetails(item) {
           const prevQty = historyItem ? (Number(historyItem.quantity) || 0) : 0;
 
           // 5. Считаем разницу
-          const currentQty = Number(item.quantity) || 0;
+          const currentQty = getItemQuantityValue(item);
           const diff = currentQty - prevQty;
           const diffSign = diff > 0 ? '+' : '';
           const diffClass = diff > 0 ? 'text-green-500' : (diff < 0 ? 'text-red-500' : 'text-slate-400');
@@ -1974,9 +1974,9 @@ async function saveItemChanges() {
       updates.sku = skuEdit.value.trim() || null;
     }
 
-    // Количество (только в режиме редактирования)
+    // Количество (Текущий остаток)
     if (quantityInput && quantityInput.value !== undefined) {
-      updates.quantity = parseFloat(quantityInput.value) || 0;
+      updates.current_quantity = parseFloat(quantityInput.value) || 0;
     }
 
     // Базовая валидация (без визуальных индикаторов ошибок)

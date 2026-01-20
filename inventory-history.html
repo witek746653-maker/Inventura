@@ -121,91 +121,12 @@
       <!-- Archive Section -->
       <section>
         <h3 class="text-slate-900 dark:text-white text-lg font-bold leading-tight mb-3 px-1">Архив отчетов</h3>
-        <div
-          class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden">
-          <!-- Item: Nov 2023 -->
-          <div
-            class="group flex items-center justify-between p-4 active:bg-slate-50 dark:active:bg-slate-700/50 transition-colors cursor-pointer">
-            <div class="flex items-center gap-4">
-              <div
-                class="flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 shrink-0 w-10 h-10 text-green-600 dark:text-green-400">
-                <span class="material-symbols-outlined text-[20px]">check_circle</span>
-              </div>
-              <div class="flex flex-col">
-                <p class="text-slate-900 dark:text-white text-base font-semibold leading-snug">Ноябрь 2023</p>
-                <p class="text-slate-500 dark:text-slate-400 text-sm font-normal">Товаров: <span
-                    class="text-slate-700 dark:text-slate-300 font-medium">12&nbsp;120 шт.</span></p>
-              </div>
-            </div>
-            <div class="flex flex-col items-end gap-1">
-              <span class="text-slate-400 dark:text-slate-500 text-xs">01.12.23</span>
-              <div
-                class="px-2 py-0.5 rounded bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-bold">
-                -0.5%
-              </div>
-            </div>
-          </div>
-          <!-- Item: Oct 2023 -->
-          <div
-            class="group flex items-center justify-between p-4 active:bg-slate-50 dark:active:bg-slate-700/50 transition-colors cursor-pointer">
-            <div class="flex items-center gap-4">
-              <div
-                class="flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 shrink-0 w-10 h-10 text-green-600 dark:text-green-400">
-                <span class="material-symbols-outlined text-[20px]">check_circle</span>
-              </div>
-              <div class="flex flex-col">
-                <p class="text-slate-900 dark:text-white text-base font-semibold leading-snug">Октябрь 2023</p>
-                <p class="text-slate-500 dark:text-slate-400 text-sm font-normal">Товаров: <span
-                    class="text-slate-700 dark:text-slate-300 font-medium">11&nbsp;980 шт.</span></p>
-              </div>
-            </div>
-            <div class="flex flex-col items-end gap-1">
-              <span class="text-slate-400 dark:text-slate-500 text-xs">01.11.23</span>
-              <div
-                class="px-2 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-xs font-bold">
-                +1.2%
-              </div>
-            </div>
-          </div>
-          <!-- Item: Sept 2023 -->
-          <div
-            class="group flex items-center justify-between p-4 active:bg-slate-50 dark:active:bg-slate-700/50 transition-colors cursor-pointer">
-            <div class="flex items-center gap-4">
-              <div
-                class="flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 shrink-0 w-10 h-10 text-green-600 dark:text-green-400">
-                <span class="material-symbols-outlined text-[20px]">check_circle</span>
-              </div>
-              <div class="flex flex-col">
-                <p class="text-slate-900 dark:text-white text-base font-semibold leading-snug">Сентябрь 2023</p>
-                <p class="text-slate-500 dark:text-slate-400 text-sm font-normal">Товаров: <span
-                    class="text-slate-700 dark:text-slate-300 font-medium">11&nbsp;500 шт.</span></p>
-              </div>
-            </div>
-            <div class="flex flex-col items-end gap-1">
-              <span class="text-slate-400 dark:text-slate-500 text-xs">01.10.23</span>
-              <div
-                class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs font-bold">
-                0.0%
-              </div>
-            </div>
-          </div>
-          <!-- Item: Aug 2023 (Draft) -->
-          <div
-            class="group flex items-center justify-between p-4 active:bg-slate-50 dark:active:bg-slate-700/50 transition-colors cursor-pointer">
-            <div class="flex items-center gap-4">
-              <div
-                class="flex items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30 shrink-0 w-10 h-10 text-amber-600 dark:text-amber-400">
-                <span class="material-symbols-outlined text-[20px]">edit_document</span>
-              </div>
-              <div class="flex flex-col">
-                <p class="text-slate-900 dark:text-white text-base font-semibold leading-snug">Август 2023</p>
-                <p class="text-slate-500 dark:text-slate-400 text-sm font-normal">Черновик</p>
-              </div>
-            </div>
-            <div class="flex flex-col items-end gap-1">
-              <span class="text-slate-400 dark:text-slate-500 text-xs">28.08.23</span>
-              <span class="material-symbols-outlined text-slate-300 dark:text-slate-600 text-sm">chevron_right</span>
-            </div>
+        <div id="reports-list-container"
+          class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden min-h-[100px]">
+          <!-- Состояние загрузки (будет заменено реальными данными) -->
+          <div class="flex flex-col items-center justify-center p-12 text-slate-400 dark:text-slate-500">
+            <span class="material-symbols-outlined animate-spin mb-3 text-primary text-3xl">sync</span>
+            <p class="text-sm font-medium italic">Загрузка истории отчетов...</p>
           </div>
         </div>
         <div class="mt-4 flex justify-center">

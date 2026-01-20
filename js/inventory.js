@@ -15,7 +15,7 @@ import * as items from './items.js';
  * @returns {string} - UUID
  */
 function generateId() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -37,11 +37,11 @@ export async function createInventorySession(sessionData) {
     status: sessionData.status || 'in_progress',
     items_count: 0
   };
-  
+
   try {
     // Сохраняем локально
     const localSession = await db.addInventorySession(session);
-    
+
     // Пытаемся синхронизировать с сервером
     try {
       const serverSession = await supabase.createInventorySession(session);
@@ -65,30 +65,30 @@ export async function createInventorySession(sessionData) {
 export async function getAllInventorySessions() {
   try {
     const localSessions = await db.getAllInventorySessions();
-    
+
     try {
       const serverSessions = await supabase.fetchAllInventorySessions();
-      
+
       // Объединяем данные
       const sessionsMap = new Map();
-      
+
       serverSessions.forEach(session => {
         sessionsMap.set(session.id, { ...session, synced: true });
       });
-      
+
       localSessions.forEach(session => {
         if (!sessionsMap.has(session.id)) {
           sessionsMap.set(session.id, session);
         }
       });
-      
+
       // Обновляем локальную базу
       for (const session of serverSessions) {
         await db.updateInventorySession(session.id, { ...session, synced: true }).catch(() => {
-          db.addInventorySession({ ...session, synced: true }).catch(() => {});
+          db.addInventorySession({ ...session, synced: true }).catch(() => { });
         });
       }
-      
+
       return Array.from(sessionsMap.values());
     } catch (syncError) {
       console.warn('Не удалось получить сессии с сервера:', syncError);
@@ -109,7 +109,7 @@ export async function getAllInventorySessions() {
 export async function getInventorySessionById(id) {
   try {
     let session = await db.getInventorySessionById(id);
-    
+
     if (!session || !session.synced) {
       try {
         const serverSession = await supabase.fetchInventorySessionById(id);
@@ -125,7 +125,7 @@ export async function getInventorySessionById(id) {
         console.warn('Не удалось получить сессию с сервера:', syncError);
       }
     }
-    
+
     return session;
   } catch (error) {
     console.error('Ошибка получения сессии:', error);
@@ -229,7 +229,7 @@ export async function getPreviousSessionComparison(sessionId) {
 export async function updateInventorySession(id, updates) {
   try {
     const localSession = await db.updateInventorySession(id, updates);
-    
+
     try {
       const serverSession = await supabase.updateInventorySession(id, updates);
       await db.updateInventorySession(id, { ...serverSession, synced: true });
@@ -250,11 +250,37 @@ export async function updateInventorySession(id, updates) {
  * @param {string} id - ID сессии
  * @returns {Promise<Object>} - Promise с обновленной сессией
  */
+/**
+ * Завершить сессию инвентаризации и обновить текущие остатки товаров
+ * 
+ * @param {string} id - ID сессии
+ * @returns {Promise<Object>} - Promise с обновленной сессией
+ */
 export async function completeInventorySession(id) {
-  return await updateInventorySession(id, {
+  // 1. Обновляем статус сессии на 'completed'
+  const session = await updateInventorySession(id, {
     status: 'completed',
     updated_at: new Date().toISOString()
   });
+
+  // 2. Получаем все записи инвентаризации для этой сессии
+  const inventoryItems = await getInventoryItemsBySession(id);
+
+  // 3. Переносим посчитанное количество в карточки товаров как "Текущий остаток"
+  for (const invItem of inventoryItems) {
+    if (invItem.item_id && invItem.quantity !== null) {
+      try {
+        // Мы используем items.updateItem, который сам позаботится о локальном сохранении и синхронизации
+        await items.updateItem(invItem.item_id, {
+          current_quantity: Number(invItem.quantity) || 0
+        });
+      } catch (error) {
+        console.error(`Ошибка обновления остатка для товара ${invItem.item_id} при завершении сессии:`, error);
+      }
+    }
+  }
+
+  return session;
 }
 
 /**
@@ -272,7 +298,7 @@ export async function addOrUpdateInventoryItem(sessionId, itemId, quantity, prev
     // Получаем существующие записи для этой сессии и товара
     const existingItems = await db.getInventoryItemsBySession(sessionId);
     const existingItem = existingItems.find(item => item.item_id === itemId);
-    
+
     const inventoryItem = {
       id: existingItem ? existingItem.id : generateId(),
       session_id: sessionId,
@@ -282,11 +308,11 @@ export async function addOrUpdateInventoryItem(sessionId, itemId, quantity, prev
       difference: previousQuantity !== null ? quantity - previousQuantity : null,
       comment: comment
     };
-    
+
     if (existingItem) {
       // Обновляем существующую запись
       const localItem = await db.updateInventoryItem(existingItem.id, inventoryItem);
-      
+
       try {
         const serverItem = await supabase.updateInventoryItem(existingItem.id, inventoryItem);
         await db.updateInventoryItem(existingItem.id, { ...serverItem, synced: true });
@@ -298,7 +324,7 @@ export async function addOrUpdateInventoryItem(sessionId, itemId, quantity, prev
     } else {
       // Создаем новую запись
       const localItem = await db.addInventoryItem(inventoryItem);
-      
+
       try {
         const serverItem = await supabase.createInventoryItem(inventoryItem);
         await db.updateInventoryItem(inventoryItem.id, { ...serverItem, synced: true });
@@ -327,30 +353,30 @@ export async function addOrUpdateInventoryItem(sessionId, itemId, quantity, prev
 export async function getInventoryItemsBySession(sessionId) {
   try {
     const localItems = await db.getInventoryItemsBySession(sessionId);
-    
+
     try {
       const serverItems = await supabase.fetchInventoryItemsBySession(sessionId);
-      
+
       // Объединяем данные
       const itemsMap = new Map();
-      
+
       serverItems.forEach(item => {
         itemsMap.set(item.id, { ...item, synced: true });
       });
-      
+
       localItems.forEach(item => {
         if (!itemsMap.has(item.id)) {
           itemsMap.set(item.id, item);
         }
       });
-      
+
       // Обновляем локальную базу
       for (const item of serverItems) {
         await db.updateInventoryItem(item.id, { ...item, synced: true }).catch(() => {
-          db.addInventoryItem({ ...item, synced: true }).catch(() => {});
+          db.addInventoryItem({ ...item, synced: true }).catch(() => { });
         });
       }
-      
+
       return Array.from(itemsMap.values());
     } catch (syncError) {
       console.warn('Не удалось получить записи с сервера:', syncError);
@@ -371,12 +397,12 @@ export async function getInventoryItemsBySession(sessionId) {
 export async function getSessionStatistics(sessionId) {
   try {
     const items = await getInventoryItemsBySession(sessionId);
-    
+
     const total = items.length;
     const withDifference = items.filter(item => item.difference !== null && item.difference !== 0).length;
     const positiveDifference = items.filter(item => item.difference !== null && item.difference > 0).length;
     const negativeDifference = items.filter(item => item.difference !== null && item.difference < 0).length;
-    
+
     return {
       total,
       withDifference,
@@ -421,26 +447,26 @@ export async function createInventoryReport(sessionId) {
     if (!session) {
       throw new Error('Сессия не найдена');
     }
-    
+
     // Получаем все записи инвентаризации для этой сессии
     const inventoryItems = await getInventoryItemsBySession(sessionId);
     const validInventoryItems = inventoryItems.filter(item => item && item.item_id);
-    
+
     // Получаем все товары для расчета статистики
     const allItems = await items.getAllItems();
-    
+
     // Вычисляем статистику
     const totalItems = validInventoryItems.length;
-    const itemsWithDifference = validInventoryItems.filter(item => 
+    const itemsWithDifference = validInventoryItems.filter(item =>
       item.difference !== null && item.difference !== 0
     ).length;
-    const positiveDifference = validInventoryItems.filter(item => 
+    const positiveDifference = validInventoryItems.filter(item =>
       item.difference !== null && item.difference > 0
     ).length;
-    const negativeDifference = validInventoryItems.filter(item => 
+    const negativeDifference = validInventoryItems.filter(item =>
       item.difference !== null && item.difference < 0
     ).length;
-    
+
     // Создаем отчет
     const report = {
       id: generateId(),
@@ -459,10 +485,10 @@ export async function createInventoryReport(sessionId) {
         comment: item.comment
       }))
     };
-    
+
     // Сохраняем локально
     const localReport = await db.addInventoryReport(report);
-    
+
     // Пытаемся синхронизировать с сервером
     try {
       const serverReport = await supabase.createInventoryReport(report);
@@ -486,30 +512,30 @@ export async function createInventoryReport(sessionId) {
 export async function getAllInventoryReports() {
   try {
     const localReports = await db.getAllInventoryReports();
-    
+
     try {
       const serverReports = await supabase.fetchAllInventoryReports();
-      
+
       // Объединяем данные
       const reportsMap = new Map();
-      
+
       serverReports.forEach(report => {
         reportsMap.set(report.id, { ...report, synced: true });
       });
-      
+
       localReports.forEach(report => {
         if (!reportsMap.has(report.id)) {
           reportsMap.set(report.id, report);
         }
       });
-      
+
       // Обновляем локальную базу
       for (const report of serverReports) {
         await db.updateInventoryReport(report.id, { ...report, synced: true }).catch(() => {
-          db.addInventoryReport({ ...report, synced: true }).catch(() => {});
+          db.addInventoryReport({ ...report, synced: true }).catch(() => { });
         });
       }
-      
+
       return Array.from(reportsMap.values());
     } catch (syncError) {
       console.warn('Не удалось получить отчеты с сервера:', syncError);
@@ -530,7 +556,7 @@ export async function getAllInventoryReports() {
 export async function getInventoryReportById(id) {
   try {
     let report = await db.getInventoryReportById(id);
-    
+
     if (!report || !report.synced) {
       try {
         const serverReport = await supabase.fetchInventoryReportById(id);
@@ -546,7 +572,7 @@ export async function getInventoryReportById(id) {
         console.warn('Не удалось получить отчет с сервера:', syncError);
       }
     }
-    
+
     return report;
   } catch (error) {
     console.error('Ошибка получения отчета:', error);
