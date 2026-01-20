@@ -176,7 +176,7 @@ async function loadData() {
         baseQuantity: 0,
         previousQuantity: prevQty,
         comment: '',
-        saved: false, // ещё не сохранено, покажем кнопку "сохранить"
+        saved: true, // ИЗМЕНЕНО: теперь по умолчанию ставим true, чтобы автосохранение не записывало нетронутые товары в БД
         additions: []
       };
     });

@@ -18,7 +18,7 @@ function initModal() {
 
     // HTML структура модального окна
     const modalHTML = `
-    <div id="custom-modal" class="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm hidden items-center justify-center opacity-0 transition-opacity duration-200 p-4">
+    <div id="custom-modal" class="fixed inset-0 z-[100000] bg-black/70 backdrop-blur-sm hidden items-center justify-center opacity-0 transition-opacity duration-200 p-4" style="z-index: 100000;">
         <div class="bg-white dark:bg-surface-dark rounded-3xl p-4 w-full max-w-md shadow-2xl transform scale-95 transition-all duration-200 flex flex-col max-h-[90vh]">
             <h3 id="custom-modal-title" class="text-xl font-black text-slate-900 dark:text-white mb-3 leading-tight"></h3>
             <div id="custom-modal-message" class="text-[14px] text-slate-600 dark:text-slate-400 mb-4 leading-relaxed overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar"></div>
