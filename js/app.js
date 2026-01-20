@@ -547,35 +547,47 @@ async function initItemsPage() {
 
     // Настраиваем поиск в реальном времени
     const searchInput = document.querySelector('input[type="search"], input[placeholder*="Поиск"]');
+    const searchBySkuToggle = document.getElementById('search-by-sku');
+    const applyFilters = () => {
+      const query = searchInput?.value.trim() || '';
+      let filteredItems = allItems;
+
+      // Применяем фильтр категории, если выбран
+      if (window.currentCategory && window.currentCategory !== 'all') {
+        const filterCat = window.currentCategory.toLowerCase().trim();
+        filteredItems = filteredItems.filter(item => (item.category || '').toLowerCase().trim() === filterCat);
+      }
+
+      // Применяем поиск
+      if (query) {
+        const lowerQuery = query.toLowerCase();
+        const includeSku = searchBySkuToggle?.checked;
+        filteredItems = filteredItems.filter(item => {
+          const name = (item.name || '').toLowerCase();
+          const category = (item.category || '').toLowerCase();
+          const sku = item.sku ? String(item.sku).toLowerCase() : '';
+          return name.includes(lowerQuery) || category.includes(lowerQuery) || (includeSku && sku.includes(lowerQuery));
+        });
+      }
+
+      renderItemsList(filteredItems);
+    };
+
     if (searchInput) {
       let searchTimeout;
       searchInput.addEventListener('input', async (e) => {
         clearTimeout(searchTimeout);
-        const query = e.target.value.trim();
 
         // Задержка для оптимизации поиска
         searchTimeout = setTimeout(async () => {
-          let filteredItems = allItems;
-
-          // Применяем фильтр категории, если выбран
-          if (window.currentCategory && window.currentCategory !== 'all') {
-            const filterCat = window.currentCategory.toLowerCase().trim();
-            filteredItems = filteredItems.filter(item => (item.category || '').toLowerCase().trim() === filterCat);
-          }
-
-          // Применяем поиск
-          if (query) {
-            const lowerQuery = query.toLowerCase();
-            filteredItems = filteredItems.filter(item => {
-              const name = (item.name || '').toLowerCase();
-              const category = (item.category || '').toLowerCase();
-              const sku = item.sku ? String(item.sku).toLowerCase() : '';
-              return name.includes(lowerQuery) || category.includes(lowerQuery) || sku.includes(lowerQuery);
-            });
-          }
-
-          renderItemsList(filteredItems);
+          applyFilters();
         }, 300);
+      });
+    }
+
+    if (searchBySkuToggle) {
+      searchBySkuToggle.addEventListener('change', () => {
+        applyFilters();
       });
     }
 
@@ -609,6 +621,7 @@ async function initItemsPage() {
 
           let filteredItems = allItems;
           const searchQuery = searchInput?.value.trim() || '';
+          const includeSku = searchBySkuToggle?.checked;
 
           // Определяем категорию
           if (buttonText === 'Все') {
@@ -626,7 +639,7 @@ async function initItemsPage() {
               const name = (item.name || '').toLowerCase();
               const category = (item.category || '').toLowerCase();
               const sku = item.sku ? String(item.sku).toLowerCase() : '';
-              return name.includes(lowerQuery) || category.includes(lowerQuery) || sku.includes(lowerQuery);
+              return name.includes(lowerQuery) || category.includes(lowerQuery) || (includeSku && sku.includes(lowerQuery));
             });
           }
 
@@ -1168,6 +1181,7 @@ function createItemElement(item) {
   div.className = 'flex items-center gap-4 bg-white dark:bg-[#1e293b] p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 active:scale-[0.99] transition-transform cursor-pointer';
   div.setAttribute('data-item-id', item.id);
 
+  const itemSku = item.sku ? String(item.sku).trim() : '';
   const categoryColors = {
     'Посуда': 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 ring-orange-600/10',
     'Приборы': 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 ring-blue-700/10',
@@ -1199,8 +1213,9 @@ function createItemElement(item) {
   div.innerHTML = `
     <div class="bg-center bg-no-repeat bg-cover rounded-lg size-16 shrink-0 bg-slate-200" style="background-image: url('${imageUrl}');"></div>
     <div class="flex flex-col justify-center flex-1 min-w-0">
-      <p class="text-slate-900 dark:text-white text-base font-semibold leading-tight line-clamp-1 mb-1">${item.name || 'Без названия'}</p>
-      <div class="flex items-center gap-2">
+      <p class="text-slate-900 dark:text-white text-base font-semibold leading-tight line-clamp-1 mb-0.5">${item.name || 'Без названия'}</p>
+      ${itemSku ? `<p class="text-xs text-slate-500 dark:text-slate-400 leading-tight">арт. ${itemSku}</p>` : ''}
+      <div class="flex items-center gap-2 ${itemSku ? 'mt-1' : ''}">
         ${normalizedCategory ? `<span class="inline-flex items-center rounded-md ${categoryColor} px-2 py-1 text-xs font-medium ring-1 ring-inset">${normalizedCategory}</span>` : ''}
         <p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">${item.unit || 'шт'}</p>
       </div>
@@ -6357,4 +6372,3 @@ function createHelpModal(title, htmlContent) {
 
 // Экспортируем функции для использования в других модулях
 export { navigateTo, showError, showSuccess, showPageHelp };
-

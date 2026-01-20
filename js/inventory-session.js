@@ -987,6 +987,7 @@ function renderItemCard(item) {
   const totalQuantity = baseQuantity + additionsSum; // Общее количество
   const isSaved = itemData.saved;
   const hasComment = itemData.comment && itemData.comment.trim() !== '';
+  const itemSku = item.sku ? String(item.sku).trim().replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
 
   // Предыдущее количество (для сравнения)
   const previousQuantity = typeof itemData.previousQuantity === 'number' ? itemData.previousQuantity : 0;
@@ -1024,6 +1025,7 @@ function renderItemCard(item) {
                     data-name="${(item.name || 'Без названия').replace(/"/g, '&quot;')}"
                     data-unit="${item.unit || 'шт.'}"
                     title="Нажмите для увеличения">${item.name || 'Без названия'}</button>
+            ${itemSku ? `<p class="text-xs text-slate-500 dark:text-slate-400">арт. ${itemSku}</p>` : ''}
             
             <!-- Единица измерения и статус сохранения -->
             <div class="flex items-center gap-2 mt-1">
@@ -2147,4 +2149,3 @@ if (document.readyState === 'loading') {
 } else {
   initPage();
 }
-
