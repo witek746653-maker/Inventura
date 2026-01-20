@@ -424,19 +424,20 @@ export async function createInventoryReport(sessionId) {
     
     // Получаем все записи инвентаризации для этой сессии
     const inventoryItems = await getInventoryItemsBySession(sessionId);
+    const validInventoryItems = inventoryItems.filter(item => item && item.item_id);
     
     // Получаем все товары для расчета статистики
     const allItems = await items.getAllItems();
     
     // Вычисляем статистику
-    const totalItems = inventoryItems.length;
-    const itemsWithDifference = inventoryItems.filter(item => 
+    const totalItems = validInventoryItems.length;
+    const itemsWithDifference = validInventoryItems.filter(item => 
       item.difference !== null && item.difference !== 0
     ).length;
-    const positiveDifference = inventoryItems.filter(item => 
+    const positiveDifference = validInventoryItems.filter(item => 
       item.difference !== null && item.difference > 0
     ).length;
-    const negativeDifference = inventoryItems.filter(item => 
+    const negativeDifference = validInventoryItems.filter(item => 
       item.difference !== null && item.difference < 0
     ).length;
     
@@ -449,7 +450,7 @@ export async function createInventoryReport(sessionId) {
       items_with_difference: itemsWithDifference,
       positive_difference: positiveDifference,
       negative_difference: negativeDifference,
-      items: inventoryItems.map(item => ({
+      items: validInventoryItems.map(item => ({
         item_id: item.item_id,
         item_name: allItems.find(i => i.id === item.item_id)?.name || 'Неизвестный товар',
         quantity: item.quantity,
@@ -552,4 +553,3 @@ export async function getInventoryReportById(id) {
     throw error;
   }
 }
-
