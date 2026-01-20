@@ -558,7 +558,8 @@ async function initItemsPage() {
 
           // Применяем фильтр категории, если выбран
           if (window.currentCategory && window.currentCategory !== 'all') {
-            filteredItems = filteredItems.filter(item => item.category === window.currentCategory);
+            const filterCat = window.currentCategory.toLowerCase().trim();
+            filteredItems = filteredItems.filter(item => (item.category || '').toLowerCase().trim() === filterCat);
           }
 
           // Применяем поиск
@@ -613,7 +614,8 @@ async function initItemsPage() {
             window.currentCategory = 'all';
           } else {
             window.currentCategory = buttonText;
-            filteredItems = filteredItems.filter(item => item.category === buttonText);
+            const filterCat = buttonText.toLowerCase().trim();
+            filteredItems = filteredItems.filter(item => (item.category || '').toLowerCase().trim() === filterCat);
           }
 
           // Применяем поиск, если есть
