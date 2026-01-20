@@ -1498,6 +1498,7 @@ async function initItemDetailsPage() {
  */
 function renderItemDetails(item) {
   console.log('Отображение деталей товара:', item);
+  const currentQuantity = getItemQuantityValue(item);
 
   // Название товара
   const nameDisplay = document.getElementById('item-name-display');
@@ -1642,7 +1643,7 @@ function renderItemDetails(item) {
   // Текущий остаток
   const quantityInput = document.getElementById('item-quantity');
   if (quantityInput) {
-    quantityInput.value = item.quantity || 0;
+    quantityInput.value = currentQuantity;
   }
 
   // Статистика инвентаризации (Предыдущий замер и Разница)
@@ -1670,7 +1671,7 @@ function renderItemDetails(item) {
           const prevQty = historyItem ? (Number(historyItem.quantity) || 0) : 0;
 
           // 5. Считаем разницу
-          const currentQty = Number(item.quantity) || 0;
+          const currentQty = currentQuantity;
           const diff = currentQty - prevQty;
           const diffSign = diff > 0 ? '+' : '';
           const diffClass = diff > 0 ? 'text-green-500' : (diff < 0 ? 'text-red-500' : 'text-slate-400');
@@ -1689,6 +1690,12 @@ function renderItemDetails(item) {
       }
     })();
   }
+}
+
+function getItemQuantityValue(item) {
+  const rawQuantity = item?.current_quantity ?? item?.quantity;
+  const normalizedQuantity = Number(rawQuantity);
+  return Number.isFinite(normalizedQuantity) ? normalizedQuantity : 0;
 }
 
 /**
@@ -1964,7 +1971,10 @@ async function saveItemChanges() {
 
     // Количество (только в режиме редактирования)
     if (quantityInput && quantityInput.value !== undefined) {
-      updates.quantity = parseFloat(quantityInput.value) || 0;
+      const parsedQuantity = Number(quantityInput.value);
+      const normalizedQuantity = Number.isFinite(parsedQuantity) ? parsedQuantity : 0;
+      updates.quantity = normalizedQuantity;
+      updates.current_quantity = normalizedQuantity;
     }
 
     // Базовая валидация (без визуальных индикаторов ошибок)
