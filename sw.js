@@ -8,7 +8,7 @@
  */
 
 // Версия кэша — меняйте при обновлении приложения, чтобы пользователи получили новые файлы
-const CACHE_VERSION = 'v1.0.4';
+const CACHE_VERSION = 'v1.0.5';
 const CACHE_NAME = `sabor-inventura-${CACHE_VERSION}`;
 
 // Список файлов для кэширования (эти файлы будут доступны офлайн)
@@ -99,12 +99,15 @@ self.addEventListener('activate', (event) => {
  * - Если сеть недоступна, отдаём из кэша
  */
 self.addEventListener('fetch', (event) => {
-  // Пропускаем запросы к внешним ресурсам (API Supabase, CDN и т.д.)
-  if (!event.request.url.startsWith(self.location.origin)) {
+  // Пропускаем запросы к внешним ресурсам, КРОМЕ шрифтов и иконок Google
+  const isGoogleFont = event.request.url.includes('fonts.googleapis.com') ||
+    event.request.url.includes('fonts.gstatic.com');
+
+  if (!event.request.url.startsWith(self.location.origin) && !isGoogleFont) {
     return;
   }
 
-  // Пропускаем POST, PUT, DELETE запросы (их нельзя кэшировать)
+  // Пропускаем любые запросы, кроме GET (например, POST запросы в базу кэшировать нельзя)
   if (event.request.method !== 'GET') {
     return;
   }

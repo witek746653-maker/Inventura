@@ -30,18 +30,18 @@ export async function syncItems() {
     console.log('Нет интернета, синхронизация пропущена');
     return { success: false, reason: 'no_internet' };
   }
-  
+
   try {
     // Получаем несинхронизированные товары
     const unsyncedItems = await db.getUnsyncedItems(STORES.ITEMS);
-    
+
     let synced = 0;
     let errors = 0;
-    
+
     for (const item of unsyncedItems) {
       try {
         const { synced: _, ...itemToSend } = item;
-        
+
         // Проверяем, существует ли товар на сервере
         let existingItem = null;
         try {
@@ -53,7 +53,7 @@ export async function syncItems() {
             console.warn('Ошибка проверки существования товара:', item.id, fetchError.message);
           }
         }
-        
+
         if (existingItem) {
           // Товар существует на сервере, обновляем
           try {
@@ -98,7 +98,7 @@ export async function syncItems() {
                 throw createError; // Пробрасываем другие ошибки
               }
             }
-            
+
             // Если сервер вернул товар с другим ID, обновляем локальный ID
             if (serverItem && serverItem.id && serverItem.id !== item.id) {
               // Удаляем старую запись и создаем новую с серверным ID
@@ -118,7 +118,7 @@ export async function syncItems() {
         errors++;
       }
     }
-    
+
     return { success: true, synced, errors, total: unsyncedItems.length };
   } catch (error) {
     console.error('Ошибка синхронизации товаров:', error);
@@ -135,43 +135,48 @@ export async function syncInventorySessions() {
   if (!isOnline()) {
     return { success: false, reason: 'no_internet' };
   }
-  
+
   try {
     const unsyncedSessions = await db.getUnsyncedItems(STORES.INVENTORY_SESSIONS);
-    
+
     let synced = 0;
     let errors = 0;
-    
+
     for (const session of unsyncedSessions) {
       try {
         const { synced: _, ...sessionToSend } = session;
-        
+
+        let existingSession = null;
         try {
-          const existingSession = await supabase.fetchInventorySessionById(session.id);
-          if (existingSession) {
-            const serverSession = await supabase.updateInventorySession(session.id, sessionToSend);
-            await db.updateInventorySession(session.id, { ...serverSession, synced: true });
-          } else {
-            const serverSession = await supabase.createInventorySession(sessionToSend);
-            await db.updateInventorySession(session.id, { ...serverSession, synced: true });
-          }
-          synced++;
-        } catch (error) {
+          existingSession = await supabase.fetchInventorySessionById(session.id);
+        } catch (fError) {
+          // Игнорируем ошибки поиска
+        }
+
+        if (existingSession) {
+          const serverSession = await supabase.updateInventorySession(session.id, sessionToSend);
+          await db.updateInventorySession(session.id, { ...serverSession, synced: true });
+        } else {
           try {
             const serverSession = await supabase.createInventorySession(sessionToSend);
             await db.updateInventorySession(session.id, { ...serverSession, synced: true });
-            synced++;
           } catch (createError) {
-            console.error('Ошибка создания сессии на сервере:', createError);
-            errors++;
+            // Если возникла ошибка дубликата, значит сессия уже есть - просто обновим её
+            if (createError.message && (createError.message.includes('duplicate') || createError.message.includes('409'))) {
+              const serverSession = await supabase.updateInventorySession(session.id, sessionToSend);
+              await db.updateInventorySession(session.id, { ...serverSession, synced: true });
+            } else {
+              throw createError;
+            }
           }
         }
+        synced++;
       } catch (error) {
         console.error('Ошибка синхронизации сессии:', session.id, error);
         errors++;
       }
     }
-    
+
     return { success: true, synced, errors, total: unsyncedSessions.length };
   } catch (error) {
     console.error('Ошибка синхронизации сессий:', error);
@@ -188,17 +193,17 @@ export async function syncInventoryItems() {
   if (!isOnline()) {
     return { success: false, reason: 'no_internet' };
   }
-  
+
   try {
     const unsyncedItems = await db.getUnsyncedItems(STORES.INVENTORY_ITEMS);
-    
+
     let synced = 0;
     let errors = 0;
-    
+
     for (const item of unsyncedItems) {
       try {
         const { synced: _, ...itemToSend } = item;
-        
+
         try {
           // Пытаемся обновить существующую запись
           const serverItem = await supabase.updateInventoryItem(item.id, itemToSend);
@@ -220,7 +225,7 @@ export async function syncInventoryItems() {
         errors++;
       }
     }
-    
+
     return { success: true, synced, errors, total: unsyncedItems.length };
   } catch (error) {
     console.error('Ошибка синхронизации записей инвентаризации:', error);
@@ -237,7 +242,7 @@ export async function pullFromServer() {
   if (!isOnline()) {
     return { success: false, reason: 'no_internet' };
   }
-  
+
   try {
     // Получаем товары с сервера
     const serverItems = await supabase.fetchAllItems();
@@ -253,7 +258,7 @@ export async function pullFromServer() {
         console.error('Ошибка обновления товара из сервера:', error);
       }
     }
-    
+
     // Получаем сессии с сервера
     const serverSessions = await supabase.fetchAllInventorySessions();
     for (const session of serverSessions) {
@@ -268,7 +273,7 @@ export async function pullFromServer() {
         console.error('Ошибка обновления сессии из сервера:', error);
       }
     }
-    
+
     return { success: true, items: serverItems.length, sessions: serverSessions.length };
   } catch (error) {
     console.error('Ошибка получения данных с сервера:', error);
@@ -283,20 +288,21 @@ export async function pullFromServer() {
  */
 export async function fullSync() {
   if (!isOnline()) {
+    updateLastSyncStatus(false, 'Нет подключения к интернету');
     return { success: false, reason: 'no_internet' };
   }
-  
+
   console.log('Начало полной синхронизации...');
-  
+
   try {
     // Сначала получаем данные с сервера
     const pullResult = await pullFromServer();
-    
+
     // Затем отправляем локальные изменения
     const itemsResult = await syncItems();
     const sessionsResult = await syncInventorySessions();
     const inventoryItemsResult = await syncInventoryItems();
-    
+
     const result = {
       success: true,
       pull: pullResult,
@@ -306,13 +312,32 @@ export async function fullSync() {
         inventoryItems: inventoryItemsResult
       }
     };
-    
+
+    // Сохраняем время последней синхронизации
+    updateLastSyncStatus(true);
+
     console.log('Синхронизация завершена:', result);
     return result;
   } catch (error) {
     console.error('Ошибка полной синхронизации:', error);
+    updateLastSyncStatus(false, error.message);
     return { success: false, reason: 'error', error: error.message };
   }
+}
+
+/**
+ * Обновить статус последней синхронизации в локальном хранилище
+ * 
+ * @param {boolean} success - Была ли синхронизация успешной
+ * @param {string} error - Сообщение об ошибке (если есть)
+ */
+function updateLastSyncStatus(success, error = null) {
+  const syncInfo = {
+    time: new Date().toISOString(),
+    success,
+    error
+  };
+  localStorage.setItem('last_sync_info', JSON.stringify(syncInfo));
 }
 
 /**
@@ -326,7 +351,7 @@ export function setupAutoSync() {
       console.error('Ошибка автоматической синхронизации:', error);
     });
   });
-  
+
   // Периодическая синхронизация каждые 5 минут (если есть интернет)
   setInterval(() => {
     if (isOnline()) {
@@ -347,9 +372,9 @@ export async function getSyncStatus() {
     const unsyncedItems = await db.getUnsyncedItems(STORES.ITEMS);
     const unsyncedSessions = await db.getUnsyncedItems(STORES.INVENTORY_SESSIONS);
     const unsyncedInventoryItems = await db.getUnsyncedItems(STORES.INVENTORY_ITEMS);
-    
+
     const totalUnsynced = unsyncedItems.length + unsyncedSessions.length + unsyncedInventoryItems.length;
-    
+
     return {
       online: isOnline(),
       unsynced: {

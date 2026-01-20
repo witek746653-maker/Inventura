@@ -380,11 +380,34 @@
     <script type="module" src="js/app.js"></script>
     <!-- Регистрация Service Worker для PWA -->
     <script>
+      let refreshing = false;
+
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Service Worker зарегистрирован:', reg.scope))
+            .then(reg => {
+              console.log('Service Worker зарегистрирован:', reg.scope);
+
+              // Если появилось обновление, мы можем сказать об этом пользователю
+              reg.onupdatefound = () => {
+                const installingWorker = reg.installing;
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('Доступно обновление! Перезагрузите страницу.');
+                  }
+                };
+              };
+            })
             .catch(err => console.log('Service Worker ошибка:', err));
+        });
+
+        // Этот код ловит момент, когда новый SW берет управление на себя
+        // и автоматически обновляет страницу, чтобы применились новые файлы
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            window.location.reload();
+            refreshing = true;
+          }
         });
       }
     </script>

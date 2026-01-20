@@ -28,7 +28,7 @@ export async function checkConnection() {
       method: 'GET',
       headers: getHeaders()
     });
-    
+
     return response.ok;
   } catch (error) {
     console.error('Ошибка подключения к Supabase:', error);
@@ -47,11 +47,11 @@ export async function fetchAllItems() {
       method: 'GET',
       headers: getHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error(`Ошибка получения товаров: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -72,11 +72,11 @@ export async function fetchItemById(id) {
       method: 'GET',
       headers: getHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error(`Ошибка получения товара: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data[0] || null;
   } catch (error) {
@@ -95,16 +95,16 @@ export async function createItem(item) {
   try {
     // Удаляем локальные поля перед отправкой
     const { synced, ...itemToSend } = item;
-    
+
     const response = await fetch(`${API_URL}/items`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(itemToSend)
     });
-    
+
     // Читаем ответ один раз (тело ответа можно прочитать только один раз!)
     const responseText = await response.text();
-    
+
     if (!response.ok) {
       // Пытаемся прочитать ошибку из ответа
       let errorMessage = response.statusText;
@@ -121,14 +121,14 @@ export async function createItem(item) {
       }
       throw new Error(`Ошибка создания товара: ${errorMessage}`);
     }
-    
+
     // Проверяем, что ответ не пустой перед парсингом JSON
     if (!responseText || responseText.trim() === '') {
       console.warn('Сервер вернул пустой ответ. Возвращаем исходный товар.');
       // Возвращаем исходный товар, если сервер вернул пустой ответ
       return item;
     }
-    
+
     try {
       const data = JSON.parse(responseText);
       return data[0] || data || item;
@@ -160,16 +160,16 @@ export async function updateItem(id, updates) {
   try {
     // Удаляем локальные поля перед отправкой
     const { synced, ...updatesToSend } = updates;
-    
+
     const response = await fetch(`${API_URL}/items?id=eq.${id}`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify(updatesToSend)
     });
-    
+
     // Читаем ответ один раз (тело ответа можно прочитать только один раз!)
     const responseText = await response.text();
-    
+
     if (!response.ok) {
       // Пытаемся прочитать ошибку из ответа
       let errorMessage = response.statusText;
@@ -186,14 +186,14 @@ export async function updateItem(id, updates) {
       }
       throw new Error(`Ошибка обновления товара: ${errorMessage}`);
     }
-    
+
     // Проверяем, что ответ не пустой перед парсингом JSON
     if (!responseText || responseText.trim() === '') {
       console.warn('Сервер вернул пустой ответ при обновлении. Возвращаем исходные данные.');
       // Возвращаем обновленные данные, если сервер вернул пустой ответ
       return { ...updates, id };
     }
-    
+
     try {
       const data = JSON.parse(responseText);
       return data[0] || data || { ...updates, id };
@@ -226,11 +226,11 @@ export async function deleteItem(id) {
       method: 'DELETE',
       headers: getHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error(`Ошибка удаления товара: ${response.statusText}`);
     }
-    
+
     return true;
   } catch (error) {
     console.error('Ошибка удаления товара с сервера:', error);
@@ -249,11 +249,11 @@ export async function fetchAllInventorySessions() {
       method: 'GET',
       headers: getHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error(`Ошибка получения сессий: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -274,11 +274,11 @@ export async function fetchInventorySessionById(id) {
       method: 'GET',
       headers: getHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error(`Ошибка получения сессии: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data[0] || null;
   } catch (error) {
@@ -296,20 +296,20 @@ export async function fetchInventorySessionById(id) {
 export async function createInventorySession(session) {
   try {
     const { synced, ...sessionToSend } = session;
-    
+
     const response = await fetch(`${API_URL}/inventory_sessions`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(sessionToSend)
     });
-    
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Ошибка создания сессии: ${error.message || response.statusText}`);
+      const errorData = await safeJsonParse(response.clone());
+      throw new Error(`Ошибка создания сессии: ${errorData?.message || response.statusText}`);
     }
-    
-    const data = await response.json();
-    return data[0] || data;
+
+    const data = await safeJsonParse(response);
+    return Array.isArray(data) ? (data[0] || sessionToSend) : (data || sessionToSend);
   } catch (error) {
     console.error('Ошибка создания сессии на сервере:', error);
     throw error;
@@ -326,20 +326,20 @@ export async function createInventorySession(session) {
 export async function updateInventorySession(id, updates) {
   try {
     const { synced, ...updatesToSend } = updates;
-    
+
     const response = await fetch(`${API_URL}/inventory_sessions?id=eq.${id}`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify(updatesToSend)
     });
-    
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Ошибка обновления сессии: ${error.message || response.statusText}`);
+      const errorData = await safeJsonParse(response.clone());
+      throw new Error(`Ошибка обновления сессии: ${errorData?.message || response.statusText}`);
     }
-    
-    const data = await response.json();
-    return data[0] || data;
+
+    const data = await safeJsonParse(response);
+    return Array.isArray(data) ? (data[0] || { ...updates, id }) : (data || { ...updates, id });
   } catch (error) {
     console.error('Ошибка обновления сессии на сервере:', error);
     throw error;
@@ -358,11 +358,11 @@ export async function fetchInventoryItemsBySession(sessionId) {
       method: 'GET',
       headers: getHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error(`Ошибка получения записей: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -382,7 +382,7 @@ export async function fetchInventoryItemsBySession(sessionId) {
 async function fetchWithTimeout(url, options = {}, timeout = 10000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -427,13 +427,13 @@ async function safeJsonParse(response) {
 export async function createInventoryItem(inventoryItem) {
   try {
     const { synced, ...itemToSend } = inventoryItem;
-    
+
     const response = await fetchWithTimeout(`${API_URL}/inventory_items`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(itemToSend)
     }, 8000); // Таймаут 8 секунд
-    
+
     if (!response.ok) {
       let errorMessage = `Ошибка создания записи: ${response.statusText}`;
       try {
@@ -448,13 +448,13 @@ export async function createInventoryItem(inventoryItem) {
       }
       throw new Error(errorMessage);
     }
-    
+
     const data = await safeJsonParse(response);
     if (!data) {
       // Если сервер вернул пустой ответ, возвращаем исходные данные
       return itemToSend;
     }
-    
+
     return Array.isArray(data) ? (data[0] || itemToSend) : data;
   } catch (error) {
     // Не логируем ошибку здесь, чтобы не засорять консоль
@@ -473,13 +473,13 @@ export async function createInventoryItem(inventoryItem) {
 export async function updateInventoryItem(id, updates) {
   try {
     const { synced, ...updatesToSend } = updates;
-    
+
     const response = await fetchWithTimeout(`${API_URL}/inventory_items?id=eq.${id}`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify(updatesToSend)
     }, 8000); // Таймаут 8 секунд
-    
+
     if (!response.ok) {
       let errorMessage = `Ошибка обновления записи: ${response.statusText}`;
       try {
@@ -494,13 +494,13 @@ export async function updateInventoryItem(id, updates) {
       }
       throw new Error(errorMessage);
     }
-    
+
     const data = await safeJsonParse(response);
     if (!data) {
       // Если сервер вернул пустой ответ, возвращаем исходные данные
       return updatesToSend;
     }
-    
+
     return Array.isArray(data) ? (data[0] || updatesToSend) : data;
   } catch (error) {
     console.error('Ошибка обновления записи на сервере:', error);
@@ -522,10 +522,10 @@ export async function checkBucketExists(bucketName = 'item-images') {
     // Создаем маленький тестовый файл для проверки
     const testBlob = new Blob(['test'], { type: 'text/plain' });
     const testFileName = `__test_${Date.now()}.txt`;
-    
+
     // Пытаемся загрузить тестовый файл
     const storageUrl = `${supabaseConfig.url}/storage/v1/object/${bucketName}/${testFileName}`;
-    
+
     const response = await fetch(storageUrl, {
       method: 'POST',
       headers: {
@@ -534,14 +534,14 @@ export async function checkBucketExists(bucketName = 'item-images') {
       },
       body: testBlob
     });
-    
+
     // Если загрузка успешна (200 или 201), bucket существует
     if (response.ok || response.status === 201) {
       // Удаляем тестовый файл (опционально, можно оставить)
       // Для простоты просто возвращаем true
       return true;
     }
-    
+
     // Читаем текст ошибки для более точной диагностики
     const errorText = await response.text();
     let errorMessage = '';
@@ -551,15 +551,15 @@ export async function checkBucketExists(bucketName = 'item-images') {
     } catch (e) {
       errorMessage = errorText;
     }
-    
+
     // Если ошибка связана с bucket (не найден), возвращаем false
-    if (errorMessage.includes('Bucket not found') || 
-        errorMessage.includes('bucket') || 
-        response.status === 400 || 
-        response.status === 404) {
+    if (errorMessage.includes('Bucket not found') ||
+      errorMessage.includes('bucket') ||
+      response.status === 400 ||
+      response.status === 404) {
       return false;
     }
-    
+
     // Для других ошибок (например, проблемы с правами доступа) считаем, что bucket может существовать
     // но у нас нет прав для проверки - в этом случае попробуем загрузить реальные файлы
     console.warn('Не удалось проверить bucket через тестовую загрузку. Продолжаем попытку загрузки...');
@@ -589,39 +589,39 @@ export async function uploadFileToStorage(file, bucketName = 'item-images', file
       const extension = file.name ? file.name.split('.').pop() : 'png';
       fileName = `${timestamp}-${random}.${extension}`;
     }
-    
+
     // ВАЖНО: Кодируем имя файла для URL, чтобы специальные символы (скобки, пробелы и т.д.) обрабатывались правильно
     const encodedFileName = encodeURIComponent(fileName);
-    
+
     // URL для загрузки в Storage (используем закодированное имя файла)
     const storageUrl = `${supabaseConfig.url}/storage/v1/object/${bucketName}/${encodedFileName}`;
-    
+
     // Заголовки для загрузки файла
     const uploadHeaders = {
       'apikey': supabaseConfig.anonKey,
       'Authorization': `Bearer ${supabaseConfig.anonKey}`,
       // НЕ добавляем Content-Type, браузер установит его автоматически
     };
-    
+
     // Загружаем файл
     const response = await fetch(storageUrl, {
       method: 'POST',
       headers: uploadHeaders,
       body: file
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       let errorMessage = `Ошибка загрузки файла: ${response.statusText}`;
       let parsedError = null;
-      
+
       try {
         parsedError = JSON.parse(errorText);
         errorMessage = parsedError.message || parsedError.error || errorMessage;
       } catch (e) {
         errorMessage = errorText || errorMessage;
       }
-      
+
       // Проверяем, не является ли ошибка тем, что файл уже существует
       const isDuplicate = parsedError && (
         parsedError.statusCode === '409' ||
@@ -630,7 +630,7 @@ export async function uploadFileToStorage(file, bucketName = 'item-images', file
         errorMessage.includes('Duplicate') ||
         errorMessage.includes('уже существует')
       );
-      
+
       if (isDuplicate) {
         // Если файл уже существует, возвращаем его публичный URL
         // Это нормальная ситуация - файл уже загружен ранее
@@ -638,7 +638,7 @@ export async function uploadFileToStorage(file, bucketName = 'item-images', file
         console.log(`ℹ️ Файл "${fileName}" уже существует в bucket. Используем существующий файл.`);
         return publicUrl;
       }
-      
+
       // Логируем детали ошибки для отладки (только первую ошибку)
       if (!window._bucketErrorLogged) {
         window._bucketErrorLogged = true;
@@ -649,7 +649,7 @@ export async function uploadFileToStorage(file, bucketName = 'item-images', file
         console.error('Распарсенная ошибка:', parsedError);
         console.error('URL:', storageUrl);
       }
-      
+
       // Если bucket не найден, даем понятное сообщение
       // НЕ проверяем response.status === 400, так как это может быть и другая ошибка
       const isBucketError = parsedError && (
@@ -658,22 +658,22 @@ export async function uploadFileToStorage(file, bucketName = 'item-images', file
           parsedError.message.toLowerCase().includes('bucket') && parsedError.message.toLowerCase().includes('not found')
         )
       ) || (
-        errorMessage.toLowerCase().includes('bucket not found') ||
-        (errorMessage.toLowerCase().includes('bucket') && errorMessage.toLowerCase().includes('not found'))
-      );
-      
+          errorMessage.toLowerCase().includes('bucket not found') ||
+          (errorMessage.toLowerCase().includes('bucket') && errorMessage.toLowerCase().includes('not found'))
+        );
+
       if (isBucketError) {
         errorMessage = `Bucket "${bucketName}" не найден в Supabase Storage. ` +
           `Создайте bucket "${bucketName}" в Supabase Dashboard → Storage → New bucket. ` +
           `Убедитесь, что bucket публичный (Public bucket).`;
       }
-      
+
       throw new Error(errorMessage);
     }
-    
+
     // Получаем публичный URL загруженного файла (используем закодированное имя)
     const publicUrl = `${supabaseConfig.url}/storage/v1/object/public/${bucketName}/${encodedFileName}`;
-    
+
     console.log(`✅ Файл загружен: ${fileName} -> ${publicUrl}`);
     return publicUrl;
   } catch (error) {
@@ -691,10 +691,10 @@ export async function uploadFileToStorage(file, bucketName = 'item-images', file
  */
 export function base64ToBlob(base64String, mimeType = 'image/png') {
   // Удаляем префикс data:image/...;base64, если есть
-  const base64Data = base64String.includes(',') 
-    ? base64String.split(',')[1] 
+  const base64Data = base64String.includes(',')
+    ? base64String.split(',')[1]
     : base64String;
-  
+
   // Преобразуем base64 в бинарные данные
   const byteCharacters = atob(base64Data);
   const byteNumbers = new Array(byteCharacters.length);
@@ -702,7 +702,7 @@ export function base64ToBlob(base64String, mimeType = 'image/png') {
     byteNumbers[i] = byteCharacters.charCodeAt(i);
   }
   const byteArray = new Uint8Array(byteNumbers);
-  
+
   return new Blob([byteArray], { type: mimeType });
 }
 
@@ -717,7 +717,7 @@ export async function fetchAllInventoryReports() {
       method: 'GET',
       headers: getHeaders()
     });
-    
+
     if (!response.ok) {
       // Если таблица не создана в Supabase, API вернет 404.
       // Для приложения это не критично: просто считаем, что отчетов на сервере пока нет.
@@ -726,7 +726,7 @@ export async function fetchAllInventoryReports() {
       }
       throw new Error(`Ошибка получения отчетов: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return Array.isArray(data) ? data : [];
   } catch (error) {
@@ -747,11 +747,11 @@ export async function fetchInventoryReportById(id) {
       method: 'GET',
       headers: getHeaders()
     });
-    
+
     if (!response.ok) {
       throw new Error(`Ошибка получения отчета: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return Array.isArray(data) && data.length > 0 ? data[0] : null;
   } catch (error) {
@@ -769,18 +769,18 @@ export async function fetchInventoryReportById(id) {
 export async function createInventoryReport(report) {
   try {
     const { synced, ...reportToSend } = report;
-    
+
     const response = await fetch(`${API_URL}/inventory_reports`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(reportToSend)
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(`Ошибка создания отчета: ${error.message || response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data[0] || data;
   } catch (error) {
@@ -799,18 +799,18 @@ export async function createInventoryReport(report) {
 export async function updateInventoryReport(id, updates) {
   try {
     const { synced, ...updatesToSend } = updates;
-    
+
     const response = await fetch(`${API_URL}/inventory_reports?id=eq.${id}`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify(updatesToSend)
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(`Ошибка обновления отчета: ${error.message || response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data[0] || data;
   } catch (error) {

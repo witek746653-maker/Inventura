@@ -7,7 +7,7 @@
 
 import { initDB } from './db.js';
 import * as db from './db.js';
-import { setupAutoSync } from './sync.js';
+import { setupAutoSync, fullSync } from './sync.js';
 import * as items from './items.js';
 import * as inventory from './inventory.js';
 import * as supabase from './supabase.js';
@@ -5809,8 +5809,177 @@ function initItemsManagementPage() {
     });
   }
 
+  // Настраиваем мониторинг
+  initMonitoringSection();
+
   // Настраиваем модальные окна
   setupManagementModals();
+}
+
+/**
+ * Инициализация секции мониторинга и кэша
+ */
+function initMonitoringSection() {
+  const syncNowBtn = document.getElementById('sync-now-btn');
+  const updateAppBtn = document.getElementById('update-app-btn');
+  const clearCacheBtn = document.getElementById('clear-cache-btn');
+
+  // Обновляем информацию при загрузке
+  updateSyncInfoUI();
+
+  // Кнопка ручной синхронизации
+  if (syncNowBtn) {
+    syncNowBtn.addEventListener('click', async () => {
+      syncNowBtn.disabled = true;
+      syncNowBtn.classList.add('opacity-50');
+      const icon = syncNowBtn.querySelector('.material-symbols-outlined');
+      if (icon) icon.classList.add('animate-spin');
+
+      try {
+        await fullSync();
+        updateSyncInfoUI();
+      } catch (error) {
+        console.error('Ошибка ручной синхронизации:', error);
+      } finally {
+        syncNowBtn.disabled = false;
+        syncNowBtn.classList.remove('opacity-50');
+        if (icon) icon.classList.remove('animate-spin');
+      }
+    });
+  }
+
+  // Кнопка обновления файлов приложения (PWA)
+  if (updateAppBtn) {
+    updateAppBtn.addEventListener('click', async () => {
+      const confirm = await showConfirm(
+        'Обновить файлы?',
+        'Приложение скачает последнюю версию файлов и перезагрузится. Вы не потеряете свои данные.'
+      );
+      if (confirm) {
+        handleUpdateApp();
+      }
+    });
+  }
+
+  // Кнопка очистки кэша данных
+  if (clearCacheBtn) {
+    clearCacheBtn.addEventListener('click', async () => {
+      const confirm = await showDangerConfirm(
+        'Очистить кэш?',
+        'Это удалит временные файлы и может помочь, если приложение работает некорректно. Локальная база товаров останется целой.'
+      );
+      if (confirm) {
+        handleClearCache();
+      }
+    });
+  }
+}
+
+/**
+ * Обновить интерфейс информацией о последней синхронизации
+ */
+function updateSyncInfoUI() {
+  const timeEl = document.getElementById('last-sync-time');
+  const statusTab = document.getElementById('last-sync-status');
+  const dotEl = document.getElementById('last-sync-dot');
+  const textEl = document.getElementById('last-sync-text');
+
+  const syncData = localStorage.getItem('last_sync_info');
+
+  if (!syncData) {
+    if (timeEl) timeEl.textContent = 'Никогда';
+    return;
+  }
+
+  try {
+    const { time, success, error } = JSON.parse(syncData);
+    const date = new Date(time);
+
+    if (timeEl) {
+      timeEl.textContent = date.toLocaleString('ru-RU', {
+        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    if (success) {
+      statusTab?.classList.replace('bg-slate-200/50', 'bg-green-100');
+      statusTab?.classList.replace('dark:bg-slate-700/50', 'dark:bg-green-900/30');
+      dotEl?.classList.replace('bg-slate-400', 'bg-green-500');
+      if (textEl) {
+        textEl.textContent = 'Успешно';
+        textEl.classList.replace('text-slate-500', 'text-green-600');
+        textEl.classList.replace('dark:text-slate-400', 'dark:text-green-400');
+      }
+    } else {
+      statusTab?.classList.replace('bg-slate-200/50', 'bg-red-100');
+      statusTab?.classList.replace('dark:bg-slate-700/50', 'dark:bg-red-900/30');
+      dotEl?.classList.replace('bg-slate-400', 'bg-red-500');
+      if (textEl) {
+        textEl.textContent = 'Ошибка';
+        textEl.classList.replace('text-slate-500', 'text-red-600');
+        textEl.classList.replace('dark:text-slate-400', 'dark:text-red-400');
+      }
+    }
+  } catch (e) {
+    console.error('Ошибка разбора данных синхронизации:', e);
+  }
+}
+
+/**
+ * Обновить файлы приложения (принудительно перекачать кэш Service Worker)
+ */
+async function handleUpdateApp() {
+  showProgressModal('Обновление...', 'Удаляем старые файлы и скачиваем новые');
+  updateProgress(30);
+
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (let registration of registrations) {
+        await registration.unregister();
+      }
+    }
+    updateProgress(60);
+
+    const cacheNames = await caches.keys();
+    for (let name of cacheNames) {
+      await caches.delete(name);
+    }
+    updateProgress(100);
+
+    setTimeout(() => {
+      window.location.reload(true);
+    }, 500);
+  } catch (error) {
+    console.error('Ошибка обновления приложения:', error);
+    hideProgressModal();
+    showAlert('Ошибка при обновлении. Пожалуйста, перезагрузите страницу вручную.');
+  }
+}
+
+/**
+ * Очистить только кэш-хранилище (файлы), не затрагивая БД
+ */
+async function handleClearCache() {
+  showProgressModal('Очистка...', 'Освобождаем место в памяти');
+  updateProgress(50);
+
+  try {
+    const cacheNames = await caches.keys();
+    for (let name of cacheNames) {
+      await caches.delete(name);
+    }
+    updateProgress(100);
+
+    setTimeout(() => {
+      hideProgressModal();
+      showSuccessModal('Готово', 'Кэш успешно очищен. Приложение будет загружено заново при следующем посещении.');
+    }, 800);
+  } catch (error) {
+    console.error('Ошибка очистки кэша:', error);
+    hideProgressModal();
+    showAlert('Не удалось полностью очистить кэш.');
+  }
 }
 
 /**
