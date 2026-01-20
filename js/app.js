@@ -19,6 +19,11 @@ const appState = {
   currentPage: null
 };
 
+// Глобальные настройки категорий и мест хранения (для единообразия статистики)
+const VALID_CATEGORIES = ['Посуда', 'Бокалы', 'Приборы', 'Инвентарь', 'Расходники', 'Прочее'];
+const VALID_LOCATIONS = ['Бар', 'Кухня', 'Склад', 'Другое'];
+const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
+
 /**
  * Инициализация приложения
  * Вызывается при загрузке страницы
@@ -221,9 +226,9 @@ async function initInventoryPage() {
 
     // Загружаем статистику товаров, секций склада и категорий
     const allItems = await items.getAllItems();
-    // Фиксированные секции склада и категории
-    const warehouseSections = ['Бар', 'Кухня', 'Склад', 'Другое'];
-    const categories = ['Посуда', 'Бокалы', 'Приборы', 'Инвентарь', 'Расходники', 'Прочее'];
+    // Используем глобальные константы
+    const warehouseSections = VALID_LOCATIONS;
+    const categories = VALID_CATEGORIES;
 
     // Обновляем статистику на странице
     const totalItemsEl = document.getElementById('total-items');
@@ -862,10 +867,6 @@ function resetAddItemForm() {
 function validateAddItemField(fieldName) {
   const modal = document.getElementById('add-item-modal');
   if (!modal) return false;
-
-  const VALID_CATEGORIES = ['Посуда', 'Бокалы', 'Приборы', 'Инвентарь', 'Расходники', 'Прочее'];
-  const VALID_LOCATIONS = ['Бар', 'Кухня', 'Склад'];
-  const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
 
   let field, value, isValid = false;
 
@@ -2216,9 +2217,6 @@ function setupEditItemValidation() {
 function validateEditItemField(fieldName) {
   // При редактировании существующей карточки валидация работает только для логики,
   // но не показывает визуальные индикаторы ошибок
-  const VALID_CATEGORIES = ['Посуда', 'Бокалы', 'Приборы', 'Инвентарь', 'Расходники', 'Прочее'];
-  const VALID_LOCATIONS = ['Бар', 'Кухня', 'Склад'];
-  const VALID_UNITS = ['шт.', 'комп.', 'упак.'];
 
   let field, value, isValid = false;
 
@@ -5819,13 +5817,14 @@ function initItemsManagementPage() {
 async function loadDataStats() {
   try {
     const allItems = await items.getAllItems();
-    const categories = [...new Set(allItems.map(item => item.category).filter(Boolean))];
 
+    // Показываем только определенные категории, остальные игнорируем (как на главной)
     const itemsCountEl = document.getElementById('stats-items-count');
     const categoriesCountEl = document.getElementById('stats-categories-count');
 
     if (itemsCountEl) itemsCountEl.textContent = allItems.length;
-    if (categoriesCountEl) categoriesCountEl.textContent = categories.length;
+    // Всегда показываем количество из нашего утвержденного списка (6 шт)
+    if (categoriesCountEl) categoriesCountEl.textContent = VALID_CATEGORIES.length;
   } catch (error) {
     console.error('Ошибка загрузки статистики:', error);
   }
