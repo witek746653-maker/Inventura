@@ -209,6 +209,7 @@ function highlightActiveNavButton() {
  * @param {string} path - Путь к странице
  */
 function navigateTo(path) {
+  console.log('🚀 Навигация к:', path);
   window.location.href = path;
 }
 
@@ -635,7 +636,7 @@ async function initItemsPage() {
     }
 
     // Настраиваем клики на элементы списка для перехода на страницу деталей
-    setupItemClickHandlers();
+    // setupItemClickHandlers(); <-- этот вызов лишний, так как он уже есть внутри renderItemsList
 
     // Также обрабатываем существующие статические элементы на странице (если они есть)
     // Это для обратной совместимости, если на странице уже есть разметка товаров
@@ -1216,12 +1217,28 @@ function createItemElement(item) {
  * Настроить обработчики кликов на товары
  */
 function setupItemClickHandlers() {
-  document.querySelectorAll('[data-item-id]').forEach(element => {
-    element.addEventListener('click', (e) => {
-      const itemId = element.getAttribute('data-item-id');
-      if (itemId) {
-        navigateTo(`item-details.html?id=${itemId}`);
-      }
+  const itemElements = document.querySelectorAll('[data-item-id]');
+  console.log(`🔗 Настройка кликов для ${itemElements.length} элементов`);
+
+  itemElements.forEach(element => {
+    // Удаляем старые слушатели через клонирование, чтобы не было дублей
+    const newElement = element.cloneNode(true);
+    if (element.parentNode) {
+      element.parentNode.replaceChild(newElement, element);
+    }
+
+    const itemId = newElement.getAttribute('data-item-id');
+
+    // Проверка: ID должен быть валидным (не null, не undefined)
+    if (!itemId || itemId === 'undefined' || itemId === 'null') {
+      console.warn('⚠️ У элемента отсутствует валидный ID, клик не будет работать:', newElement);
+      return;
+    }
+
+    newElement.addEventListener('click', (e) => {
+      console.log(`🖱️ Клик по товару ID: ${itemId}`);
+      // Используем прямой переход. Это самый надежный способ.
+      window.location.href = `item-details.html?id=${itemId}`;
     });
   });
 }
@@ -1450,6 +1467,13 @@ function renderItemDetails(item) {
   if (nameDisplay) nameDisplay.textContent = item.name || 'Без названия';
   if (nameEdit) nameEdit.value = item.name || '';
 
+  // Изображение
+  const imageElement = document.getElementById('item-image');
+  if (imageElement) {
+    const imageUrl = item.image_url || 'images/no-image-found.png';
+    imageElement.style.backgroundImage = `url("${imageUrl}")`;
+  }
+
   // Категория
   const categoryDisplay = document.getElementById('item-category-display');
   const categoryEdit = document.getElementById('item-category-edit');
@@ -1553,18 +1577,6 @@ function renderItemDetails(item) {
   const skuEdit = document.getElementById('item-sku-edit');
   if (skuDisplay) skuDisplay.textContent = item.sku || 'Не указан';
   if (skuEdit) skuEdit.value = item.sku || '';
-
-  // Изображение
-  const imageElement = document.getElementById('item-image');
-  if (imageElement) {
-    // Проверяем, есть ли валидный URL изображения
-    if (item.image_url && item.image_url.trim() !== '') {
-      imageElement.style.backgroundImage = `url("${item.image_url}")`;
-    } else {
-      // Если изображения нет, сбрасываем backgroundImage
-      imageElement.style.backgroundImage = 'none';
-    }
-  }
 
   // Дата обновления
   const updatedDisplay = document.getElementById('item-updated-display');
@@ -2372,8 +2384,11 @@ function showUploadSuccess(fileName, data) {
     if (uploadFileName) {
       uploadFileName.textContent = fileName || `Загружено ${totalItems} позиций`;
     }
+
     if (uploadFileStats) {
-      uploadFileStats.textContent = `Загружено ${totalItems} позиций • Новых: ${data.items.length} | Ошибок: ${data.errors.length} | Дубликатов: ${data.duplicates.length}`;
+      const itemsWithImages = data.items.filter(item => item._extractedImage).length;
+      const imagesInfo = itemsWithImages > 0 ? ` (с фото: ${itemsWithImages})` : '';
+      uploadFileStats.textContent = `Новых: ${data.items.length}${imagesInfo} | Ошибок: ${data.errors.length} | Дубликатов: ${data.duplicates.length}`;
     }
   }
   if (fileSuccessIcon) {
@@ -2528,601 +2543,149 @@ window.handleFileSelect = handleFileSelect;
  */
 async function extractImagesFromExcel(file) {
   const imagesMap = new Map();
-  const imageRowMap = new Map(); // Карта: имя файла изображения -> индекс строки (0-based)
+  const imageRowMap = new Map();
 
   try {
-    console.log('🔍 Начинаем извлечение изображений из Excel файла...');
-    console.log('📋 Параметры файла:', {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: new Date(file.lastModified).toLocaleString()
-    });
+    console.log('🔍 Начинаем извлечение изображений из Excel...');
 
-    // Проверяем, что файл доступен
-    if (!file || !file.arrayBuffer) {
-      console.error('❌ Файл недоступен или не поддерживает arrayBuffer()');
-      return imagesMap;
-    }
-
-    // Проверяем, что библиотека JSZip загружена
     if (typeof JSZip === 'undefined' && typeof window.JSZip === 'undefined') {
-      console.warn('⚠️ Библиотека JSZip не загружена. Изображения не будут извлечены.');
-      console.warn('Проверьте, что библиотека JSZip подключена в items-import.html');
-      return imagesMap;
+      console.warn('⚠️ Библиотека JSZip не загружена.');
+      return { images: imagesMap, imageRowMap };
     }
 
     const JSZipLib = window.JSZip || JSZip;
-    console.log('✅ Библиотека JSZip найдена');
-
-    // Читаем файл как ArrayBuffer
-    console.log('📖 Читаем файл через arrayBuffer()...');
-    let arrayBuffer;
-    try {
-      arrayBuffer = await file.arrayBuffer();
-      console.log(`✅ Файл прочитан. Размер: ${(arrayBuffer.byteLength / 1024).toFixed(2)} КБ`);
-    } catch (readError) {
-      console.error('❌ Ошибка чтения файла:', readError);
-      // Пытаемся прочитать через FileReader как запасной вариант
-      console.log('🔄 Пытаемся прочитать через FileReader...');
-      arrayBuffer = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = reject;
-        reader.readAsArrayBuffer(file);
-      });
-      console.log(`✅ Файл прочитан через FileReader. Размер: ${(arrayBuffer.byteLength / 1024).toFixed(2)} КБ`);
-    }
-
-    // Распаковываем ZIP архив
-    console.log('📦 Распаковываем ZIP архив...');
+    const arrayBuffer = await file.arrayBuffer();
     const zip = await JSZipLib.loadAsync(arrayBuffer);
-    console.log('✅ ZIP архив распакован');
 
-    // Показываем все папки для отладки
+    // 1. Извлекаем ВСЕ изображения из xl/media/
     const allFiles = Object.keys(zip.files);
-    console.log(`📁 Всего файлов в архиве: ${allFiles.length}`);
-    const folders = new Set(allFiles.map(f => f.split('/')[0]));
-    console.log('📂 Папки в архиве:', Array.from(folders));
+    const imageFiles = allFiles.filter(path =>
+      path.startsWith('xl/media/') && !path.endsWith('/') &&
+      /\.(png|jpg|jpeg|gif|webp)$/i.test(path)
+    );
 
-    // Изображения в Excel хранятся в папке xl/media/
-    // В JSZip нужно использовать полный путь к файлу, а не получать через folder().file()
-    const mediaFolderPath = 'xl/media/';
-
-    // Ищем все файлы, которые начинаются с xl/media/ и являются изображениями
-    const imageFiles = allFiles.filter(filePath => {
-      // Проверяем, что файл находится в папке xl/media/
-      if (!filePath.startsWith(mediaFolderPath)) {
-        return false;
-      }
-
-      // Проверяем, что это файл изображения (не папка)
-      const lowerName = filePath.toLowerCase();
-      return !filePath.endsWith('/') && ( // Не папка
-        lowerName.endsWith('.png') ||
-        lowerName.endsWith('.jpg') ||
-        lowerName.endsWith('.jpeg') ||
-        lowerName.endsWith('.gif') ||
-        lowerName.endsWith('.webp')
-      );
-    });
-
-    console.log(`🖼️ Найдено изображений в Excel: ${imageFiles.length}`);
-
-    if (imageFiles.length === 0) {
-      console.warn('⚠️ Изображения не найдены в папке xl/media/');
-      // Проверяем, есть ли изображения в других местах
-      const otherImages = allFiles.filter(filePath => {
-        const lowerName = filePath.toLowerCase();
-        return !filePath.endsWith('/') && (
-          lowerName.endsWith('.png') ||
-          lowerName.endsWith('.jpg') ||
-          lowerName.endsWith('.jpeg') ||
-          lowerName.endsWith('.gif') ||
-          lowerName.endsWith('.webp')
-        );
-      });
-      if (otherImages.length > 0) {
-        console.warn(`⚠️ Найдено ${otherImages.length} изображений в других местах:`, otherImages.slice(0, 5));
-      }
-      return imagesMap;
-    }
-
-    console.log('📸 Первые изображения:', imageFiles.slice(0, 5));
-
-    // ВАЖНО: Сначала пытаемся определить связь изображений со строками через XML файлы
-    // Это нужно для правильного сопоставления изображений товарам
-    try {
-      console.log(`🔍 Вызываем parseImageRowMappings для ${imageFiles.length} изображений...`);
-      await parseImageRowMappings(zip, imageRowMap, imageFiles);
-      console.log(`✅ parseImageRowMappings завершена. Создано связей: ${imageRowMap.size}`);
-      if (imageRowMap.size === 0) {
-        console.error(`❌ КРИТИЧЕСКАЯ ПРОБЛЕМА: parseImageRowMappings не создала ни одной связи!`);
-        console.error(`   Изображения не смогут быть сопоставлены с товарами.`);
-      }
-    } catch (parseError) {
-      console.error('❌ Ошибка в parseImageRowMappings:', parseError);
-      console.error('   Детали:', parseError.message);
-      console.error('   Стек:', parseError.stack);
-      console.warn('⚠️ Не удалось определить связь изображений со строками из XML');
-    }
-
-    // Извлекаем каждое изображение напрямую из zip по полному пути
     for (const imagePath of imageFiles) {
-      try {
-        // Получаем файл напрямую из zip по полному пути
-        const zipFile = zip.file(imagePath);
+      const imageData = await zip.file(imagePath).async('blob');
+      const fileName = imagePath.split('/').pop();
+      imagesMap.set(fileName, imageData);
+    }
+    console.log(`🖼️ Извлечено изображений из медиа: ${imagesMap.size}`);
 
-        if (!zipFile) {
-          console.warn(`⚠️ Файл не найден в zip: ${imagePath}`);
-          continue;
+    // 2. Находим рисунки только для первого листа
+    const firstSheetRelsPath = 'xl/worksheets/_rels/sheet1.xml.rels';
+    const relsFile = zip.file(firstSheetRelsPath);
+
+    if (relsFile) {
+      const parser = new DOMParser();
+      const relsXml = await relsFile.async('string');
+      const relsDoc = parser.parseFromString(relsXml, 'text/xml');
+      const rels = relsDoc.getElementsByTagName('Relationship');
+
+      let drawingRel = null;
+      for (let i = 0; i < rels.length; i++) {
+        const type = rels[i].getAttribute('Type');
+        if (type && type.includes('relationships/drawing')) {
+          drawingRel = rels[i].getAttribute('Target');
+          break;
         }
-
-        // Извлекаем данные изображения
-        const imageData = await zipFile.async('blob');
-        const fileName = imagePath.split('/').pop(); // Получаем только имя файла (например, image1.png)
-        imagesMap.set(fileName, imageData);
-        console.log(`✅ Извлечено изображение: ${fileName} (${(imageData.size / 1024).toFixed(2)} КБ)`);
-      } catch (error) {
-        console.warn(`❌ Не удалось извлечь изображение ${imagePath}:`, error);
-        console.warn('Детали ошибки:', error.message);
       }
+
+      if (drawingRel) {
+        // Определение пути к drawing.xml (может быть относительным ../drawings/...)
+        const drawingPath = drawingRel.startsWith('..')
+          ? `xl${drawingRel.substring(2)}`
+          : `xl/drawings/${drawingRel}`;
+
+        console.log(`🔍 Парсим слой рисунков: ${drawingPath}`);
+        await parseImageRowMappings(zip, imageRowMap, drawingPath, Array.from(imagesMap.keys()));
+      }
+    } else {
+      console.warn('⚠️ Связи рисунков для Лист1 не найдены.');
     }
 
-    console.log(`✅ Извлечение завершено. Всего извлечено: ${imagesMap.size} изображений`);
-    if (imageRowMap.size > 0) {
-      console.log(`📋 Определена связь для ${imageRowMap.size} изображений со строками`);
-    }
-
-    return { images: imagesMap, imageRowMap: imageRowMap };
+    return { images: imagesMap, imageRowMap };
   } catch (error) {
-    console.error('❌ Ошибка извлечения изображений из Excel:', error);
-    console.error('Детали ошибки:', error.message, error.stack);
-    return { images: imagesMap, imageRowMap: new Map() };
+    console.error('❌ Ошибка extractImagesFromExcel:', error);
+    return { images: imagesMap, imageRowMap };
   }
 }
 
-/**
- * Парсинг XML файлов Excel для определения связи изображений со строками
- * 
- * @param {JSZip} zip - Распакованный Excel файл
- * @param {Map} imageRowMap - Карта для сохранения связей (имя файла -> индекс строки)
- * @param {Array} imageFiles - Массив путей к файлам изображений
- */
-async function parseImageRowMappings(zip, imageRowMap, imageFiles) {
-  console.log(`🔍 Начинаем parseImageRowMappings: ${imageFiles.length} изображений для обработки`);
+async function parseImageRowMappings(zip, imageRowMap, drawingPath, imageFileNames) {
   try {
-    // Ищем файл worksheet (обычно xl/worksheets/sheet1.xml)
-    const worksheetFiles = Object.keys(zip.files).filter(path =>
-      path.startsWith('xl/worksheets/sheet') && path.endsWith('.xml')
-    );
+    const drawingFile = zip.file(drawingPath);
+    if (!drawingFile) return;
 
-    console.log(`📄 Найдено worksheet файлов: ${worksheetFiles.length}`);
-
-    if (worksheetFiles.length === 0) {
-      console.warn('⚠️ Файлы worksheet не найдены');
-      return;
-    }
-
-    // Используем первый лист
-    const worksheetPath = worksheetFiles[0];
-    const worksheetFile = zip.file(worksheetPath);
-
-    if (!worksheetFile) {
-      console.warn(`⚠️ Файл worksheet не найден: ${worksheetPath}`);
-      return;
-    }
-
-    // Читаем XML worksheet
-    const worksheetXml = await worksheetFile.async('string');
+    const xmlText = await drawingFile.async('string');
     const parser = new DOMParser();
-    const worksheetDoc = parser.parseFromString(worksheetXml, 'text/xml');
+    const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
 
-    // Ищем все элементы drawing (изображения)
-    const drawings = worksheetDoc.getElementsByTagName('drawing');
+    const anchors = [
+      ...Array.from(xmlDoc.getElementsByTagName('xdr:twoCellAnchor')),
+      ...Array.from(xmlDoc.getElementsByTagName('xdr:oneCellAnchor')),
+      ...Array.from(xmlDoc.getElementsByTagName('twoCellAnchor')),
+      ...Array.from(xmlDoc.getElementsByTagName('oneCellAnchor'))
+    ];
 
-    console.log(`🖼️ Найдено элементов drawing: ${drawings.length}`);
-
-    if (drawings.length === 0) {
-      console.warn('⚠️ Элементы drawing не найдены в worksheet');
-      console.warn('   Это может означать, что изображения встроены нестандартным способом');
-      return;
-    }
-
-    // Получаем rId из атрибута r:id (например, "rId1")
-    const drawingRIds = [];
-    for (let i = 0; i < drawings.length; i++) {
-      const rId = drawings[i].getAttribute('r:id');
-      if (rId) {
-        drawingRIds.push(rId);
-      }
-    }
-
-    console.log(`📋 Найдено ${drawingRIds.length} элементов drawing в worksheet`);
-
-    // Находим файл relationships для worksheet
-    const sheetNumber = worksheetPath.match(/sheet(\d+)\.xml/)?.[1] || '1';
-    const relsPath = `xl/worksheets/_rels/sheet${sheetNumber}.xml.rels`;
+    // Находим файл отношений для этого рисунка (например, xl/drawings/_rels/drawing1.xml.rels)
+    const drawingFileName = drawingPath.split('/').pop();
+    const relsPath = `xl/drawings/_rels/${drawingFileName}.rels`;
     const relsFile = zip.file(relsPath);
+    const relsMap = new Map();
 
-    if (!relsFile) {
-      console.warn(`⚠️ Файл relationships не найден: ${relsPath}`);
-      return;
-    }
-
-    // Читаем relationships XML
-    const relsXml = await relsFile.async('string');
-    const relsDoc = parser.parseFromString(relsXml, 'text/xml');
-
-    // Находим связь между drawing и файлом drawings
-    const relationships = relsDoc.getElementsByTagName('Relationship');
-    const drawingRelations = new Map();
-
-    for (let i = 0; i < relationships.length; i++) {
-      const rel = relationships[i];
-      const id = rel.getAttribute('Id');
-      const target = rel.getAttribute('Target');
-      const type = rel.getAttribute('Type');
-
-      console.log(`   Relationship ${i}: Id="${id}", Type="${type}", Target="${target}"`);
-
-      // Ищем связи с типом drawing
-      if (type && type.includes('drawing')) {
-        // Преобразуем относительный путь в абсолютный
-        // Relationships файл находится в xl/worksheets/_rels/, поэтому относительные пути идут оттуда
-        let fullPath;
-        if (target.startsWith('/')) {
-          // Абсолютный путь
-          fullPath = target.substring(1);
-        } else if (target.startsWith('../')) {
-          // "../drawings/drawing1.xml" -> убираем "../" и получаем "drawings/drawing1.xml"
-          // Затем добавляем "xl/" -> "xl/drawings/drawing1.xml"
-          const relativePath = target.replace('../', '');
-          fullPath = `xl/${relativePath}`;
-        } else if (target.startsWith('drawings/')) {
-          // "drawings/drawing1.xml" -> "xl/drawings/drawing1.xml"
-          fullPath = `xl/${target}`;
-        } else {
-          // Просто имя файла -> "xl/drawings/drawing1.xml"
-          fullPath = `xl/drawings/${target}`;
-        }
-
-        // Нормализуем путь: убираем все "../" и двойные слеши
-        // Например: "xl/drawings/../drawings/drawing1.xml" -> "xl/drawings/drawing1.xml"
-        const pathParts = fullPath.split('/');
-        const normalizedParts = [];
-        for (const part of pathParts) {
-          if (part === '..') {
-            normalizedParts.pop(); // Убираем предыдущую часть
-          } else if (part !== '.' && part !== '') {
-            normalizedParts.push(part);
-          }
-        }
-        fullPath = normalizedParts.join('/');
-
-        console.log(`   ✅ Drawing relation: ${id} -> "${target}" -> "${fullPath}"`);
-        drawingRelations.set(id, fullPath);
+    if (relsFile) {
+      const relsXml = await relsFile.async('string');
+      const relsDoc = parser.parseFromString(relsXml, 'text/xml');
+      const rels = relsDoc.getElementsByTagName('Relationship');
+      for (let i = 0; i < rels.length; i++) {
+        const id = rels[i].getAttribute('Id');
+        const target = rels[i].getAttribute('Target');
+        const fileName = target.split('/').pop();
+        relsMap.set(id, fileName);
       }
     }
 
-    // Создаем массив для хранения информации о связи изображений со строками
-    const imageRowMappings = [];
+    anchors.forEach(anchor => {
+      const from = anchor.getElementsByTagName('xdr:from')[0] || anchor.getElementsByTagName('from')[0];
+      if (!from) return;
 
-    console.log(`📋 Найдено drawing RIds: ${drawingRIds.length}`, drawingRIds);
-    console.log(`📋 Найдено drawing relations: ${drawingRelations.size}`);
-    console.log(`📋 Drawing relations:`, Array.from(drawingRelations.entries()));
+      const rowElem = from.getElementsByTagName('xdr:row')[0] || from.getElementsByTagName('row')[0];
+      const colElem = from.getElementsByTagName('xdr:col')[0] || from.getElementsByTagName('col')[0];
+      if (!rowElem) return;
 
-    // Проходим по всем drawing файлам и извлекаем информацию о позициях изображений
-    for (const rId of drawingRIds) {
-      const drawingPath = drawingRelations.get(rId);
-      console.log(`🔍 Обрабатываем rId "${rId}": drawingPath = "${drawingPath}"`);
+      const row = parseInt(rowElem.textContent, 10);
+      const col = colElem ? parseInt(colElem.textContent, 10) : 1; // По умолчанию колонка 1 (B)
+      const excelRowNumber = row + 1;
 
-      if (!drawingPath) {
-        console.warn(`⚠️ Для rId "${rId}" не найден drawingPath в drawingRelations`);
-        continue;
+      // Ищем тег картинки (pic -> blipFill -> blip)
+      const blip = anchor.getElementsByTagName('a:blip')[0] ||
+        anchor.getElementsByTagName('blip')[0] ||
+        anchor.querySelector('[*|embed]'); // Ищем любой тег с атрибутом embed
+
+      if (!blip) {
+        console.warn(`⚠️ В анкере строки ${excelRowNumber} не найден blip (картинка)`);
+        return;
       }
 
-      const drawingFile = zip.file(drawingPath);
-      if (!drawingFile) {
-        console.error(`❌ Drawing файл не найден в zip: ${drawingPath}`);
-        console.error(`   Проверяем доступные файлы в xl/drawings/:`);
-        const drawingsFiles = Object.keys(zip.files).filter(f => f.includes('drawings/') && !f.includes('_rels'));
-        console.error(`   Найдено файлов:`, drawingsFiles);
-        continue;
+      const rId = blip.getAttribute('r:embed') ||
+        blip.getAttribute('embed') ||
+        blip.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed') ||
+        Array.from(blip.attributes).find(a => a.name.includes('embed'))?.value;
+
+      const fileName = relsMap.get(rId);
+      if (fileName) {
+        // Если на одной строке несколько картинок (в разных колонках), 
+        // отдаем приоритет картинке в колонке 1 (B), где по шаблону фото.
+        // Но сохраняем любую, если другой еще нет.
+        if (!imageRowMap.has(excelRowNumber) || col === 1) {
+          imageRowMap.set(excelRowNumber, fileName);
+          console.log(`📸 Привязка: строка ${excelRowNumber} (кол ${col}) -> ${fileName} (rId: ${rId})`);
+        }
+      } else {
+        console.warn(`⚠️ Не удалось найти файл для rId: ${rId} в отношениях рисунка`);
       }
-
-      console.log(`✅ Drawing файл найден: ${drawingPath}`);
-
-      try {
-        console.log(`📖 Читаем drawing файл: ${drawingPath}`);
-        const drawingXml = await drawingFile.async('string');
-        console.log(`✅ Drawing файл прочитан, размер: ${drawingXml.length} символов`);
-
-        const drawingDoc = parser.parseFromString(drawingXml, 'text/xml');
-
-        // Проверяем на ошибки парсинга
-        const parserError = drawingDoc.querySelector('parsererror');
-        if (parserError) {
-          console.error(`❌ Ошибка парсинга XML в ${drawingPath}:`, parserError.textContent);
-          continue;
-        }
-
-        console.log(`🔍 Ищем anchors в drawing файле...`);
-
-        // Ищем элементы twoCellAnchor (позиция изображения между двумя ячейками)
-        // Также проверяем oneCellAnchor (изображение в одной ячейке)
-        let anchors = drawingDoc.getElementsByTagName('xdr:twoCellAnchor');
-        console.log(`   xdr:twoCellAnchor найдено: ${anchors.length}`);
-        if (anchors.length === 0) {
-          anchors = drawingDoc.getElementsByTagName('twoCellAnchor');
-          console.log(`   twoCellAnchor найдено: ${anchors.length}`);
-        }
-
-        // Пробуем также oneCellAnchor
-        let oneCellAnchors = drawingDoc.getElementsByTagName('xdr:oneCellAnchor');
-        console.log(`   xdr:oneCellAnchor найдено: ${oneCellAnchors.length}`);
-        if (oneCellAnchors.length === 0) {
-          oneCellAnchors = drawingDoc.getElementsByTagName('oneCellAnchor');
-          console.log(`   oneCellAnchor найдено: ${oneCellAnchors.length}`);
-        }
-
-        // Объединяем все anchors
-        const allAnchors = [...Array.from(anchors), ...Array.from(oneCellAnchors)];
-
-        console.log(`🔍 Найдено anchors в drawing файле ${drawingPath}: ${allAnchors.length}`);
-
-        if (allAnchors.length === 0) {
-          console.error(`❌ КРИТИЧЕСКАЯ ПРОБЛЕМА: Не найдено ни одного anchor в drawing файле!`);
-          console.error(`   Проверяем структуру XML...`);
-          // Выводим первые 500 символов XML для отладки
-          console.error(`   Начало XML:`, drawingXml.substring(0, 500));
-          // Пробуем найти элементы через другие методы (без querySelectorAll, так как он не поддерживает XPath функции)
-          const allElements = drawingDoc.getElementsByTagName('*');
-          const anchorLikeElements = Array.from(allElements).filter(el =>
-            el.tagName && (el.tagName.includes('Anchor') || el.tagName.includes('anchor'))
-          );
-          console.error(`   Элементы с "anchor" в имени (через getElementsByTagName): ${anchorLikeElements.length}`);
-          if (anchorLikeElements.length > 0) {
-            console.error(`   Примеры:`, anchorLikeElements.slice(0, 3).map(el => el.tagName));
-          }
-        }
-
-        console.log(`🔄 Начинаем обработку ${allAnchors.length} anchors...`);
-
-        for (let i = 0; i < allAnchors.length; i++) {
-          const anchor = allAnchors[i];
-
-          // Логируем первые несколько anchors для отладки
-          if (i < 3) {
-            console.log(`🔍 Обрабатываем anchor ${i}, tagName: ${anchor.tagName}`);
-          }
-
-          // Ищем элемент from с разными вариантами пространств имен
-          let from = anchor.getElementsByTagName('xdr:from')[0];
-          if (!from) {
-            from = anchor.getElementsByTagName('from')[0];
-          }
-
-          if (!from) {
-            if (i < 5) {
-              console.warn(`⚠️ Anchor ${i}: элемент 'from' не найден`);
-              // Показываем структуру anchor для первых нескольких
-              console.warn(`   Дочерние элементы:`, Array.from(anchor.children).map(c => c.tagName));
-            }
-            continue;
-          }
-
-          // Ищем элемент row
-          let rowElem = from.getElementsByTagName('xdr:row')[0];
-          if (!rowElem) {
-            rowElem = from.getElementsByTagName('row')[0];
-          }
-
-          if (!rowElem || rowElem.textContent === null || rowElem.textContent === undefined) {
-            console.warn(`⚠️ Anchor ${i}: элемент 'row' не найден или пустой`);
-            console.warn(`   Дочерние элементы 'from':`, Array.from(from.children).map(c => `${c.tagName}=${c.textContent}`));
-            continue;
-          }
-
-          const row = parseInt(rowElem.textContent, 10);
-          // ВАЖНО: В Excel XML нумерация строк может быть 0-based или 1-based
-          // Проверяем: если row = 0, то это может быть 0-based (первая строка данных = 0)
-          // Если row >= 1, то это 1-based (первая строка данных = 1 или 2)
-          console.log(`📊 Anchor ${i}: найдена строка ${row} (textContent: "${rowElem.textContent}")`);
-          console.log(`   → Если 1-based: строка Excel ${row}, индекс данных ${row - 2}, артикул ${row - 1}`);
-          console.log(`   → Если 0-based: строка Excel ${row + 1}, индекс данных ${row}, артикул ${row + 1}`);
-
-          // Используем row как есть (обычно это 1-based, где 1 = первая строка Excel)
-
-          // Пропускаем строку 0 (заголовки)
-          if (isNaN(row) || row < 1) {
-            console.warn(`⚠️ Anchor ${i}: строка ${row} невалидна, пропускаем`);
-            continue;
-          }
-
-          // Ищем связанное изображение через blip
-          let blip = anchor.getElementsByTagName('a:blip')[0];
-          if (!blip) {
-            blip = anchor.getElementsByTagName('blip')[0];
-          }
-
-          if (!blip) {
-            if (i < 5) {
-              console.warn(`⚠️ Anchor ${i}: элемент 'blip' не найден`);
-              // Показываем структуру anchor для отладки
-              const pic = anchor.getElementsByTagName('xdr:pic')[0] || anchor.getElementsByTagName('pic')[0];
-              if (pic) {
-                console.warn(`   Найден элемент 'pic', его дочерние:`, Array.from(pic.children).map(c => c.tagName));
-              }
-            }
-            continue;
-          }
-
-          // Пробуем разные варианты атрибута embed
-          const embed = blip.getAttribute('r:embed') || blip.getAttribute('embed') || blip.getAttribute('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed');
-
-          if (i < 5) {
-            console.log(`   Anchor ${i}: найден blip, embed = "${embed}"`);
-          }
-
-          if (!embed) {
-            if (i < 5) {
-              console.warn(`⚠️ Anchor ${i}: атрибут 'embed' не найден в blip`);
-              console.warn(`   Все атрибуты blip:`, Array.from(blip.attributes).map(a => `${a.name}="${a.value}"`));
-            }
-            continue;
-          }
-
-          if (i < 5) {
-            console.log(`🔗 Anchor ${i}: найден embed ID "${embed}"`);
-          }
-
-          // Находим файл изображения через relationships
-          const drawingFileName = drawingPath.split('/').pop();
-          const imageRelPath = `xl/drawings/_rels/${drawingFileName}.rels`;
-          const imageRelsFile = zip.file(imageRelPath);
-
-          if (imageRelsFile) {
-            try {
-              const imageRelsXml = await imageRelsFile.async('string');
-              const imageRelsDoc = parser.parseFromString(imageRelsXml, 'text/xml');
-              const imageRels = imageRelsDoc.getElementsByTagName('Relationship');
-
-              if (i < 5) {
-                console.log(`📋 В relationships файле найдено ${imageRels.length} связей, ищем embed ID "${embed}"`);
-              }
-
-              let foundRel = false;
-              for (let j = 0; j < imageRels.length; j++) {
-                const rel = imageRels[j];
-                const relId = rel.getAttribute('Id');
-
-                if (i < 5) {
-                  console.log(`   Связь ${j}: Id="${relId}", Target="${rel.getAttribute('Target')}"`);
-                }
-
-                if (relId === embed) {
-                  foundRel = true;
-                  const imageTarget = rel.getAttribute('Target');
-                  if (!imageTarget) continue;
-
-                  // Правильно определяем путь к изображению
-                  // Target в relationships может быть: "../media/image1.png" или "media/image1.png"
-                  let fullImagePath;
-                  if (imageTarget.startsWith('/')) {
-                    fullImagePath = imageTarget.substring(1);
-                  } else if (imageTarget.startsWith('../')) {
-                    // "../media/image1.png" -> "xl/media/image1.png"
-                    fullImagePath = imageTarget.replace('../', 'xl/');
-                  } else if (imageTarget.startsWith('media/')) {
-                    // "media/image1.png" -> "xl/media/image1.png"
-                    fullImagePath = `xl/${imageTarget}`;
-                  } else {
-                    // Просто имя файла -> "xl/media/image1.png"
-                    fullImagePath = `xl/media/${imageTarget}`;
-                  }
-
-                  const fileName = fullImagePath.split('/').pop();
-
-                  // Проверяем, что файл действительно существует в списке изображений
-                  const imageFileExists = imageFiles.some(path => path.includes(fileName));
-                  if (!imageFileExists) {
-                    console.warn(`⚠️ Изображение "${fileName}" найдено в XML, но не найдено в списке файлов`);
-                  }
-
-                  // В Excel нумерация строк начинается с 1
-                  // row в XML - это номер строки в Excel (1-based)
-                  // В Excel: строка 1 = заголовки, строка 2 = первая строка данных (артикул 1, индекс 0)
-                  // dataIndex - это индекс в массиве данных (0-based)
-                  // 
-                  // ПРАВИЛЬНАЯ ФОРМУЛА: dataIndex = row - 2
-                  // row = 2 (первая строка данных) -> dataIndex = 0 ✓
-                  // row = 3 (вторая строка данных) -> dataIndex = 1 ✓
-                  const dataIndex = row - 2; // row = 2 -> index = 0, row = 3 -> index = 1
-
-                  // Детальное логирование для отладки
-                  console.log(`📊 XML: row=${row} -> dataIndex=${dataIndex} -> артикул должен быть ${dataIndex + 1}`);
-
-                  // Пропускаем строку 1 (заголовки) и строки с отрицательным индексом
-                  if (dataIndex >= 0 && row >= 2) {
-                    imageRowMappings.push({
-                      fileName: fileName,
-                      rowExcel: row,
-                      dataIndex: dataIndex
-                    });
-                    console.log(`   ✅ Сохранено: "${fileName}" -> строка Excel ${row} (индекс ${dataIndex}, артикул ${dataIndex + 1})`);
-                  } else {
-                    console.warn(`   ⚠️ Пропущено: "${fileName}" в строке ${row} (заголовки или невалидная строка)`);
-                  }
-                  break;
-                }
-              }
-
-              if (!foundRel) {
-                console.error(`❌ Embed ID "${embed}" не найден в relationships файле!`);
-                console.error(`   Доступные ID:`, Array.from(imageRels).map(r => r.getAttribute('Id')));
-              }
-            } catch (relsError) {
-              console.error(`❌ Ошибка чтения relationships файла ${imageRelPath}:`, relsError);
-              console.error(`   Детали:`, relsError.message);
-            }
-          } else {
-            console.error(`❌ Relationships файл не найден: ${imageRelPath}`);
-            console.error(`   Проверяем доступные файлы в xl/drawings/_rels/:`);
-            const relsFiles = Object.keys(zip.files).filter(f => f.includes('drawings/_rels'));
-            console.error(`   Найдено файлов:`, relsFiles);
-          }
-        }
-      } catch (drawingError) {
-        console.warn(`⚠️ Ошибка парсинга drawing файла ${drawingPath}:`, drawingError.message);
-      }
-    }
-
-    // Сортируем связи по номеру строки в Excel для правильного порядка
-    imageRowMappings.sort((a, b) => a.rowExcel - b.rowExcel);
-
-    // Выводим информацию о найденных связях
-    console.log(`📋 Найдено ${imageRowMappings.length} связей изображений со строками:`);
-    for (let i = 0; i < Math.min(imageRowMappings.length, 10); i++) {
-      const mapping = imageRowMappings[i];
-      console.log(`  - "${mapping.fileName}" -> строка Excel ${mapping.rowExcel} (индекс данных ${mapping.dataIndex})`);
-    }
-    if (imageRowMappings.length > 10) {
-      console.log(`  ... и еще ${imageRowMappings.length - 10} связей`);
-    }
-
-    // Сохраняем все найденные связи в карту
-    for (let i = 0; i < imageRowMappings.length; i++) {
-      const mapping = imageRowMappings[i];
-      imageRowMap.set(mapping.fileName, mapping.dataIndex);
-      if (i < 5) {
-        console.log(`✅ Сохранена связь: "${mapping.fileName}" -> индекс ${mapping.dataIndex} (строка Excel ${mapping.rowExcel})`);
-      }
-    }
-
-    if (imageRowMappings.length > 5) {
-      console.log(`✅ ... и еще ${imageRowMappings.length - 5} связей сохранено`);
-    }
-
-    // Если не удалось определить связи из XML
-    if (imageRowMappings.length === 0 && imageFiles.length > 0) {
-      console.error('❌ КРИТИЧЕСКАЯ ПРОБЛЕМА: Не удалось определить связи изображений со строками из XML!');
-      console.error(`   Изображений найдено: ${imageFiles.length}`);
-      console.error(`   Элементов drawing: ${drawings.length}`);
-      console.error(`   Это означает, что изображения не смогут быть сопоставлены с товарами.`);
-      console.error(`   Возможные причины:`);
-      console.error(`   1. Изображения встроены нестандартным способом`);
-      console.error(`   2. XML структура отличается от ожидаемой`);
-      console.error(`   3. Ошибка при парсинге XML файлов`);
-    } else if (imageRowMappings.length > 0) {
-      console.log(`✅ Успешно определено ${imageRowMappings.length} связей изображений со строками`);
-    }
+    });
   } catch (error) {
-    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА в parseImageRowMappings:', error);
-    console.error('   Сообщение:', error.message);
-    console.error('   Стек:', error.stack);
-    // НЕ пробрасываем ошибку дальше, чтобы не прерывать процесс
-    // Просто логируем и продолжаем
+    console.error('❌ Ошибка parseImageRowMappings:', error);
   }
 }
 
@@ -3152,68 +2715,97 @@ function parseExcelFile(file) {
         // Парсим Excel с помощью библиотеки xlsx
         const workbook = XLSXLib.read(data, { type: 'array' });
 
-        // Берем первый лист
+        // Важно: берем первый лист и читаем его целиком c ячейки A1 (range: 0)
+        // Это гарантирует, что rawData[0] — это всегда 1-я строка Excel
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-
-        // Преобразуем в JSON (массив объектов)
-        const jsonData = XLSXLib.utils.sheet_to_json(worksheet, {
-          header: 1, // Используем первую строку как заголовки
-          defval: '' // Значение по умолчанию для пустых ячеек
+        const rawData = XLSXLib.utils.sheet_to_json(worksheet, {
+          header: 1,
+          range: 0,
+          defval: null
         });
 
-        if (jsonData.length < 2) {
-          reject(new Error('Файл пуст или содержит только заголовки'));
+        if (rawData.length === 0) {
+          reject(new Error('Файл пуст'));
           return;
         }
 
-        // Первая строка - заголовки
-        const headers = jsonData[0].map(h => String(h).trim().toLowerCase());
-        console.log('Заголовки из Excel:', headers);
+        // 1. Поиск строки заголовка
+        // Ищем строку, в первой колонке которой есть "Артикул" или "sku"
+        let headerRowIndex = -1;
+        for (let i = 0; i < Math.min(rawData.length, 20); i++) {
+          const firstCell = String(rawData[i][0] || '').toLowerCase();
+          if (firstCell.includes('артикул') || firstCell.includes('sku')) {
+            headerRowIndex = i;
+            break;
+          }
+        }
 
-        // Остальные строки - данные
-        const rows = jsonData.slice(1);
-        console.log('Всего строк данных:', rows.length);
+        let firstDataRowIndex;
+        if (headerRowIndex === -1) {
+          // Если заголовок не найден по ключевым словам, проверяем строку 0.
+          const row0 = rawData[0];
+          // Если в первой ячейке есть хоть что-то — считаем её данными
+          const hasDataInRow0 = row0 && row0[0] !== null && String(row0[0]).trim() !== '';
 
-        // Преобразуем в массив объектов
-        // Фильтруем строки: оставляем только те, где есть хотя бы одно непустое значение
-        // и при этом есть значение в колонке "название" (обязательное поле)
-        const result = rows
-          .filter(row => {
-            // Проверяем, что строка не полностью пустая
-            const hasData = row.some(cell => cell !== '' && cell !== null && cell !== undefined);
-            if (!hasData) return false;
+          if (hasDataInRow0) {
+            console.log('⚠️ Заголовок "Артикул" не найден, но строка 0 содержит данные. Начинаем с 0.');
+            firstDataRowIndex = 0;
+          } else {
+            console.warn('⚠️ Строка 0 пуста или не содержит Артикул, начинаем с 1.');
+            firstDataRowIndex = 1;
+          }
+        } else {
+          console.log(`✅ Заголовок найден в строке Excel ${headerRowIndex + 1}. Данные начинаются со строки ${headerRowIndex + 2}`);
+          firstDataRowIndex = headerRowIndex + 1;
+        }
+        const result = [];
 
-            // Проверяем, что есть название (это обязательное поле)
-            const nameIndex = headers.indexOf('название');
-            if (nameIndex >= 0 && row[nameIndex]) {
-              const nameValue = String(row[nameIndex]).trim();
-              return nameValue !== '';
-            }
+        // 2. Парсинг данных
+        // Структура колонок (1..8):
+        // 1: Артикул (sku)
+        // 2: Фото (photo/image) - игнорируем здесь, берем из объектов
+        // 3: Название (name)
+        // 4: Описание (description)
+        // 5: Категория (category)
+        // 6: Единицы измерения (unit)
+        // 7: Место хранения (location)
+        // 8: Текущее количество (quantity)
 
-            // Если колонка "название" не найдена, но есть данные - оставляем строку
-            return hasData;
-          })
-          .map((row, rowIndex) => {
-            const item = {};
-            headers.forEach((header, index) => {
-              const value = row[index];
-              // Обрабатываем значения: null, undefined, пустые строки
-              item[header] = (value !== null && value !== undefined && value !== '')
-                ? String(value).trim()
-                : '';
-            });
-            // ВАЖНО: Сохраняем номер строки Excel для правильной привязки изображений
-            // rowIndex - это индекс в массиве rows (0-based)
-            // В Excel: строка 1 = заголовки, строка 2 = первая строка данных (rowIndex = 0)
-            // ПРАВИЛЬНАЯ ФОРМУЛА: rowIndex + 2
-            // rowIndex = 0 (первая строка данных) -> Excel строка 2 ✓
-            // rowIndex = 1 (вторая строка данных) -> Excel строка 3 ✓
-            item._excelRowNumber = rowIndex + 2;
-            return item;
-          });
+        for (let i = firstDataRowIndex; i < rawData.length; i++) {
+          const row = rawData[i];
+          if (!row || row.length === 0) continue;
 
-        console.log('✅ Преобразовано объектов:', result.length);
+          // Артикул (обязателен для определения конца таблицы)
+          const sku = row[0];
+          if (sku === null || sku === undefined || String(sku).trim() === '') {
+            // Если артикула нет, считаем, что данные закончились (как просил USER)
+            continue;
+          }
+
+          const item = {
+            sku: String(sku).trim(),
+            name: String(row[2] || '').trim(),
+            description: String(row[3] || '').trim(),
+            category: String(row[4] || '').trim(),
+            unit: String(row[5] || '').trim(),
+            location: String(row[6] || '').trim(),
+            // Количество может быть пустым -> null
+            quantity: (row[7] !== null && row[7] !== undefined && row[7] !== '')
+              ? Number(row[7])
+              : null,
+            _excelRowNumber: i + 1 // Номер строки в Excel (1-based)
+          };
+
+          // Добавляем запись, если есть название (базовая валидация)
+          if (item.name) {
+            result.push(item);
+          } else {
+            console.warn(`⚠️ Строка ${i + 1} пропущена: есть артикул ${item.sku}, но нет названия`);
+          }
+        }
+
+        console.log(`✅ Преобразовано объектов: ${result.length}`);
         if (result.length > 0) {
           console.log('📋 Пример первого объекта:', result[0]);
         }
@@ -3221,31 +2813,13 @@ function parseExcelFile(file) {
         // Извлекаем изображения из Excel файла
         console.log('═══════════════════════════════════════');
         console.log('🔄 ЭТАП: Начинаем извлечение изображений из Excel...');
-        console.log('📋 Проверяем доступность файла:', {
-          name: file?.name,
-          size: file?.size,
-          type: file?.type,
-          hasArrayBuffer: typeof file?.arrayBuffer === 'function'
-        });
-        console.log('📋 Проверка библиотеки JSZip:', typeof JSZip !== 'undefined' || typeof window.JSZip !== 'undefined');
-        console.log('📁 Файл для извлечения:', file.name, file.size, 'байт');
 
         let imagesResult = { images: new Map(), imageRowMap: new Map() };
         try {
           imagesResult = await extractImagesFromExcel(file);
           console.log(`✅ Извлечение завершено. Найдено изображений: ${imagesResult.images.size}`);
-          if (imagesResult.images.size > 0) {
-            console.log('📸 Список извлеченных изображений:', Array.from(imagesResult.images.keys()));
-            if (imagesResult.imageRowMap.size > 0) {
-              console.log(`✅ Определена связь для ${imagesResult.imageRowMap.size} изображений со строками`);
-            }
-          } else {
-            console.log('⚠️ Изображения не найдены в Excel файле');
-          }
         } catch (extractError) {
           console.error('❌ Ошибка при извлечении изображений:', extractError);
-          console.error('Детали:', extractError.message, extractError.stack);
-          // Продолжаем работу даже если извлечение изображений не удалось
           imagesResult = { images: new Map(), imageRowMap: new Map() };
         }
 
@@ -3266,6 +2840,7 @@ function parseExcelFile(file) {
     reader.readAsArrayBuffer(file);
   });
 }
+
 
 /**
  * Парсинг CSV файла
@@ -3352,37 +2927,21 @@ function createSlug(text) {
  * @returns {Promise<Object>} - Обработанные данные с ошибками и дубликатами
  */
 async function processImportedData(rawData, extractedImages = new Map(), imageRowMap = new Map()) {
-  console.log(`📦 Начинаем обработку данных:`);
-  console.log(`   Строк данных: ${rawData.length}`);
-  console.log(`   Изображений извлечено: ${extractedImages.size}`);
+  console.log('📦 Начинаем обработку импортированных данных...');
 
-  // НОВАЯ ЛОГИКА: игнорируем XML координаты (imageRowMap)
-  // Сортируем изображения по имени файла и привязываем последовательно
-  const sortedImages = Array.from(extractedImages.entries())
-    .sort((a, b) => {
-      // Извлекаем номера из имён файлов для сортировки
-      const numA = parseInt(a[0].match(/\d+/)?.[0] || '0');
-      const numB = parseInt(b[0].match(/\d+/)?.[0] || '0');
-      return numA - numB;
-    });
-
-  console.log(`   📊 Изображения отсортированы по именам файлов`);
-  if (sortedImages.length > 0) {
-    console.log(`   📋 Первые изображения:`, sortedImages.slice(0, 5).map(([name]) => name).join(', '));
-  }
-
-  // Список строк Excel БЕЗ картинок (пропускаем их при привязке изображений)
-  const rowsWithoutImages = new Set([18, 20, 68, 69, 73, 80, 90, 99, 100, 107, 109, 130, 142, 149]);
-  console.log(`   🚫 Строки без картинок (${rowsWithoutImages.size} шт):`, Array.from(rowsWithoutImages).sort((a, b) => a - b).join(', '));
-
-  // Счётчик для последовательной привязки изображений к строкам с товарами
-  let imageIndex = 0;
-
-  // Получаем все существующие товары для проверки дубликатов
-  const existingItems = await items.getAllItems();
-
-  // Импортируем функцию для загрузки изображений в Supabase Storage
-  const { uploadFileToStorage } = await import('./supabase.js');
+  // Статистика для отчета
+  const stats = {
+    totalRows: rawData.length,
+    processedRows: 0,
+    imagesFound: extractedImages.size,
+    imagesMatched: 0,
+    unmappedImages: [],
+    rowsWithoutSku: [],
+    created: 0,
+    updated: 0,
+    errors: 0,
+    duplicates: 0
+  };
 
   const processed = {
     items: [],
@@ -3390,544 +2949,164 @@ async function processImportedData(rawData, extractedImages = new Map(), imageRo
     duplicates: []
   };
 
-  // Set для отслеживания дубликатов внутри импортируемого файла
-  // Ключ = "название|описание|артикул|фото" (все 4 поля)
-  const importedDuplicateKeys = new Set();
+  const existingItems = await items.getAllItems();
+  const { uploadFileToStorage } = await import('./supabase.js');
 
-  // Set для отслеживания артикулов внутри файла (для проверки конфликтов)
+  // Отслеживание дубликатов и SKU внутри файла
+  const importedDuplicateKeys = new Set();
   const importedSkus = new Set();
 
-  // Маппинг русских названий столбцов на английские
-  // Важно: ключи должны быть в нижнем регистре, так как заголовки нормализуются
+  // Маппинг колонок (для CSV или если не нормализовано)
   const columnMapping = {
-    'название': 'name',
-    'name': 'name',
-    'категория': 'category',
-    'category': 'category',
-    'единица измерения': 'unit',
-    'единица': 'unit',
-    'unit': 'unit',
-    'место хранения': 'location',
-    'location': 'location',
-    'артикул': 'sku',
-    'sku': 'sku',
-    'описание': 'description',
-    'description': 'description',
-    // Все возможные варианты названий колонок с изображениями
-    'фото': 'photo',
-    'photo': 'photo',
-    'image_url': 'photo',
-    'image': 'photo',
-    'изображение': 'photo',
-    'url изображения': 'photo',
-    'ссылка на фото': 'photo',
-    'ссылка на изображение': 'photo',
-    'картинка': 'photo',
-    'img': 'photo',
-    'img_url': 'photo',
-    'picture': 'photo',
-    'url': 'photo' // Если колонка называется просто "url", это может быть изображение
+    'артикул': 'sku', 'sku': 'sku',
+    'название': 'name', 'name': 'name',
+    'описание': 'description', 'description': 'description',
+    'категория': 'category', 'category': 'category',
+    'единицы измерения': 'unit', 'единица': 'unit', 'unit': 'unit',
+    'место хранения': 'location', 'location': 'location',
+    'количество': 'quantity', 'текущее количество': 'quantity'
   };
 
-  console.log('Обработка данных. Всего строк:', rawData.length);
-  console.log('Пример первой строки:', rawData[0]);
+  // Список всех имен файлов изображений для отслеживания невостребованных
+  const unmappedImageFiles = new Set(extractedImages.keys());
 
-  // Логируем все найденные колонки для отладки
-  if (rawData.length > 0) {
-    const allColumns = Object.keys(rawData[0]);
-    console.log('Найденные колонки в файле:', allColumns);
-    console.log('Колонки, которые будут распознаны как изображения:',
-      allColumns.filter(col => columnMapping[col.toLowerCase()] === 'photo'));
-  }
+  console.log(`📸 Извлечено картинок: ${stats.imagesFound}`);
+  console.log(`📋 Связей строк с картинками: ${imageRowMap.size}`);
 
   rawData.forEach((row, index) => {
-    // Используем _excelRowNumber если есть, иначе вычисляем из индекса
-    // В Excel: строка 1 = заголовки, строка 2 = первая строка данных (index = 0)
-    // ПРАВИЛЬНАЯ ФОРМУЛА: index + 2
-    const rowNumber = row._excelRowNumber || (index + 2); // +2 потому что первая строка - заголовки, нумерация с 1
+    stats.processedRows++;
 
-    // Преобразуем ключи в нижний регистр и нормализуем
-    const normalizedRow = {};
-    Object.keys(row).forEach(key => {
-      const normalizedKey = columnMapping[key.toLowerCase()] || key.toLowerCase();
-      normalizedRow[normalizedKey] = row[key];
-    });
+    // Номер строки Excel для логов и маппинга
+    const excelRow = row._excelRowNumber || (index + 2);
 
-    // Логируем первые несколько строк для отладки
-    if (index < 3) {
-      console.log(`Строка ${rowNumber}:`, { оригинал: row, нормализовано: normalizedRow });
-      // Специально логируем информацию об изображениях
-      if (normalizedRow.photo) {
-        console.log(`  → Найдено изображение: "${normalizedRow.photo}"`);
-      } else {
-        // Проверяем, есть ли в оригинале колонка с изображением, которая не была распознана
-        const imageColumns = Object.keys(row).filter(col => {
-          const colLower = col.toLowerCase();
-          return colLower.includes('фото') || colLower.includes('image') ||
-            colLower.includes('photo') || colLower.includes('img') ||
-            colLower.includes('изображение') || colLower.includes('картинка');
-        });
-        if (imageColumns.length > 0) {
-          console.log(`  → ВНИМАНИЕ: Найдена колонка, похожая на изображение, но не распознанная:`, imageColumns);
-          imageColumns.forEach(col => {
-            console.log(`    - "${col}": "${row[col]}"`);
-          });
-        }
-      }
+    // Нормализация данных
+    const data = {};
+    if (row.sku !== undefined) {
+      Object.assign(data, row);
+    } else {
+      Object.keys(row).forEach(key => {
+        const normKey = columnMapping[key.toLowerCase()] || key.toLowerCase();
+        data[normKey] = row[key];
+      });
     }
 
-    // Валидация
-    const name = (normalizedRow.name || '').trim();
-    const sku = (normalizedRow.sku || '').trim();
-    const unit = (normalizedRow.unit || '').trim();
-    const category = (normalizedRow.category || '').trim();
-    const location = (normalizedRow.location || '').trim();
-    const description = (normalizedRow.description || '').trim();
+    const sku = String(data.sku || '').trim();
+    const name = String(data.name || '').trim();
 
-    // Проверка обязательных полей
+    // 1. Валидация Артикула (обязателен)
+    if (!sku) {
+      console.warn(`⚠️ Строка ${excelRow}: пропущена (пустой артикул)`);
+      stats.rowsWithoutSku.push(excelRow);
+      processed.errors.push({
+        row: excelRow,
+        data: data,
+        message: 'Отсутствует артикул (обязательно)'
+      });
+      return;
+    }
+
+    // 2. Валидация Названия
     if (!name) {
       processed.errors.push({
-        row: rowNumber,
-        data: normalizedRow,
+        row: excelRow,
+        data: data,
         message: 'Отсутствует название товара'
       });
       return;
     }
 
-    // Проверка обязательного поля: артикул
-    if (!sku) {
-      processed.errors.push({
-        row: rowNumber,
-        data: normalizedRow,
-        message: 'Отсутствует артикул'
-      });
-      return;
-    }
+    // 3. Поиск изображения по номеру строки (Anchor logic)
+    let matchedImage = null;
+    const imageFileName = imageRowMap.get(excelRow);
 
-    // Проверка обязательного поля: категория
-    if (!category) {
-      processed.errors.push({
-        row: rowNumber,
-        data: normalizedRow,
-        message: 'Отсутствует категория'
-      });
-      return;
-    }
+    if (imageFileName && extractedImages.has(imageFileName)) {
+      matchedImage = extractedImages.get(imageFileName);
+      unmappedImageFiles.delete(imageFileName);
+      stats.imagesMatched++;
 
-    // Проверка обязательного поля: место хранения
-    if (!location) {
-      processed.errors.push({
-        row: rowNumber,
-        data: normalizedRow,
-        message: 'Отсутствует место хранения'
-      });
-      return;
-    }
+      const extension = imageFileName.split('.').pop().toLowerCase() || 'png';
+      const slug = createSlug(name);
+      // Ограничиваем длину slug для безопасности
+      const safeSlug = slug.substring(0, 30);
+      const finalFileName = `${safeSlug || 'item'}_${sku}_row${excelRow}.${extension}`;
 
-    // Проверка обязательного поля: единица измерения
-    if (!unit) {
-      processed.errors.push({
-        row: rowNumber,
-        data: normalizedRow,
-        message: 'Отсутствует единица измерения'
-      });
-      return;
-    }
-
-    // ВАЖНО: Обрабатываем изображения ДО проверки на дубликаты,
-    // чтобы изображения были доступны и для дубликатов
-    // Обрабатываем поле "фото" - может быть URL или путь к изображению
-    let imageUrl = null;
-
-    // Проверяем normalizedRow.photo (после маппинга)
-    if (normalizedRow.photo) {
-      const photoValue = String(normalizedRow.photo).trim();
-      // Пропускаем пустые значения, null, undefined
-      if (photoValue && photoValue !== 'null' && photoValue !== 'undefined' && photoValue !== '') {
-        // Если это URL (начинается с http:// или https://), используем как есть
-        if (photoValue.startsWith('http://') || photoValue.startsWith('https://')) {
-          imageUrl = photoValue;
-        } else if (photoValue.startsWith('data:image')) {
-          // Если это base64 изображение, используем как есть
-          imageUrl = photoValue;
-        } else if (photoValue !== '') {
-          // Если это путь к файлу, можно попробовать преобразовать в URL
-          // Или просто сохранить как есть, если это относительный путь
-          imageUrl = photoValue;
-        }
-      }
-    }
-
-    // Также проверяем оригинальные ключи на случай, если маппинг не сработал
-    // Ищем любую колонку, которая может содержать изображение
-    if (!imageUrl) {
-      Object.keys(row).forEach(key => {
-        const keyLower = key.toLowerCase();
-        // Если это похоже на колонку с изображением
-        if ((keyLower.includes('фото') || keyLower.includes('image') ||
-          keyLower.includes('photo') || keyLower.includes('img') ||
-          keyLower.includes('изображение') || keyLower.includes('картинка') ||
-          keyLower === 'url') && row[key]) {
-          const value = String(row[key]).trim();
-          if (value && value !== 'null' && value !== 'undefined' && value !== '') {
-            imageUrl = value;
-            console.log(`Найдено изображение в колонке "${key}":`, imageUrl);
-          }
-        }
-      });
-    }
-
-    // НОВАЯ ЛОГИКА: последовательная привязка изображений к непустым строкам
-    // Игнорируем XML координаты, так как изображения размещены "поверх" таблицы
-    if (!imageUrl && sortedImages.length > 0) {
-      let matchedImage = null;
-      let matchedFileName = null;
-
-      console.log(`\n🔍 ====== СТРОКА EXCEL ${rowNumber} ======`);
-      console.log(`   📝 Товар: "${name.substring(0, 40)}..."`);
-
-      // ВАЖНО: Проверяем, не входит ли эта строка Excel в список строк БЕЗ картинок
-      if (rowsWithoutImages.has(rowNumber)) {
-        console.log(`   🚫 Строка Excel ${rowNumber} в списке БЕЗ картинок`);
-        console.log(`   ❌ РЕЗУЛЬТАТ: image_url = null (по списку исключений)\n`);
-        // Явно устанавливаем null
-        normalizedRow._extractedImage = null;
-        normalizedRow.image_url = null;
-      }
-      // Проверяем, что это непустая строка с товаром (есть название)
-      else if (name && name.trim() !== '') {
-        // Берём следующее изображение из отсортированного списка
-        if (imageIndex < sortedImages.length) {
-          const [fileName, imageBlob] = sortedImages[imageIndex];
-          matchedImage = imageBlob;
-          matchedFileName = fileName;
-          imageIndex++; // Переходим к следующему изображению
-
-          console.log(`   ✅ Привязано изображение #${imageIndex}: "${fileName}"`);
-          console.log(`   🔢 Осталось изображений: ${sortedImages.length - imageIndex}`);
-
-          // Извлекаем расширение из оригинального файла
-          let fileExtension = 'png'; // По умолчанию png
-          if (matchedFileName && matchedFileName.includes('.')) {
-            const parts = matchedFileName.split('.');
-            fileExtension = parts[parts.length - 1].toLowerCase();
-          }
-
-          // Создаём slug из названия товара
-          const slug = createSlug(name);
-
-          // Формируем имя в формате {slug}.{расширение}
-          const finalFileName = slug ? `${slug}.${fileExtension}` : `image${imageIndex}.${fileExtension}`;
-
-          normalizedRow._extractedImage = {
-            blob: matchedImage,
-            fileName: finalFileName,
-            originalFileName: matchedFileName
-          };
-
-          console.log(`   📎 ✅ РЕЗУЛЬТАТ: "${matchedFileName}" → "${finalFileName}"`);
-          console.log(`   🏷️ Slug: "${slug}" (из: "${name.substring(0, 30)}...")\n`);
-        } else {
-          console.log(`   ⚠️ Изображения закончились (всего было ${sortedImages.length})`);
-          console.log(`   ❌ РЕЗУЛЬТАТ: image_url = null\n`);
-          normalizedRow._extractedImage = null;
-          normalizedRow.image_url = null;
-        }
-      } else {
-        console.log(`   ⏭️ Пропускаем: пустая строка или нет названия`);
-        console.log(`   ❌ РЕЗУЛЬТАТ: image_url = null\n`);
-        normalizedRow._extractedImage = null;
-        normalizedRow.image_url = null;
-      }
-    } else if (!imageUrl && extractedImages.size === 0) {
-      // Если изображений вообще нет в файле
-      normalizedRow._extractedImage = null;
-    }
-
-    // Сохраняем обработанное изображение в normalizedRow для использования в дубликатах
-    // ВАЖНО: Если изображение не найдено (_extractedImage === null и нет imageUrl), то image_url должен быть null
-    if (normalizedRow._extractedImage === null && !imageUrl) {
-      normalizedRow.image_url = null; // Явно устанавливаем null, если изображение не найдено
+      data._extractedImage = {
+        blob: matchedImage,
+        fileName: finalFileName,
+        originalFileName: imageFileName
+      };
+      console.log(`   ✅ Строка ${excelRow}: привязана картинка "${imageFileName}" -> "${finalFileName}"`);
     } else {
-      normalizedRow.image_url = imageUrl || null; // Используем URL из колонки, если есть, иначе null
+      console.log(`   ⚪ Строка ${excelRow}: фото не найдено.`);
     }
 
-    // Логируем все изображения для отладки
-    if (normalizedRow._extractedImage) {
-      console.log(`✓ Строка ${rowNumber} (${name}): изображение "${normalizedRow._extractedImage.fileName}" будет загружено`);
-    } else if (imageUrl) {
-      console.log(`✓ Строка ${rowNumber} (${name}): используется URL из колонки:`, imageUrl);
-    } else {
-      console.log(`✗ Строка ${rowNumber} (${name}): изображение отсутствует, image_url = null`);
-    }
+    // 4. Проверка на дубликаты и конфликты SKU
+    const lowerSku = sku.toLowerCase();
 
-    // Получаем URL изображения для сравнения
-    // Для извлечённых изображений используем имя файла, для URL - сам URL
-    let currentImageIdentifier = null;
-    if (normalizedRow._extractedImage && normalizedRow._extractedImage.fileName) {
-      currentImageIdentifier = normalizedRow._extractedImage.fileName.toLowerCase();
-    } else if (imageUrl) {
-      try {
-        const url = new URL(imageUrl);
-        currentImageIdentifier = url.pathname.split('/').pop().toLowerCase();
-      } catch {
-        currentImageIdentifier = imageUrl.split('/').pop().toLowerCase();
-      }
-    }
-
-    // Проверка на дубликаты: ПОЛНОЕ совпадение ВСЕХ 4 полей
-    // Дубликат = название + описание + артикул + фото полностью идентичны
-    let isDuplicate = false;
-    let existingItem = null;
-
-    const normalizedSku = String(sku).trim().toLowerCase();
-    const descLower = description ? description.toLowerCase() : '';
-
-    // Сначала проверяем дубликаты в СУЩЕСТВУЮЩЕЙ базе данных
-    existingItem = existingItems.find(item => {
-      // Сравниваем название
-      const itemName = (item.name || '').toLowerCase().trim();
-      if (itemName !== name.toLowerCase()) return false;
-
-      // Сравниваем описание
-      const itemDesc = (item.description || '').toLowerCase().trim();
-      if (itemDesc !== descLower) return false;
-
-      // Сравниваем артикул
-      const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
-      if (itemSku !== normalizedSku) return false;
-
-      // Сравниваем фото (по имени файла или URL)
-      let itemImageIdentifier = null;
-      // Проверяем, что image_url существует И является строкой
-      if (item.image_url && typeof item.image_url === 'string') {
-        try {
-          const url = new URL(item.image_url);
-          itemImageIdentifier = url.pathname.split('/').pop().toLowerCase();
-        } catch {
-          itemImageIdentifier = item.image_url.split('/').pop().toLowerCase();
-        }
-      }
-
-      // Если оба пустые - это совпадение
-      if (!currentImageIdentifier && !itemImageIdentifier) return true;
-      // Если только один пустой - не совпадение
-      if (!currentImageIdentifier || !itemImageIdentifier) return false;
-      // Сравниваем идентификаторы изображений
-      return currentImageIdentifier === itemImageIdentifier;
-    });
-
-    if (existingItem) {
-      isDuplicate = true;
-    }
-
-    // Если не нашли в базе, проверяем дубликаты ВНУТРИ импортируемого файла
-    if (!isDuplicate) {
-      // Создаём уникальный ключ из всех 4 полей для сравнения
-      const duplicateKey = `${name.toLowerCase()}|${descLower}|${normalizedSku}|${currentImageIdentifier || ''}`;
-
-      if (importedDuplicateKeys.has(duplicateKey)) {
-        // Нашли дубликат внутри файла - добавляем как дубликат
-        // Находим первую запись с таким же ключом
-        const firstItem = processed.items.find(item => {
-          const itemDesc = (item.description || '').toLowerCase().trim();
-          const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
-          let itemImageId = null;
-          if (item._extractedImage && item._extractedImage.fileName) {
-            itemImageId = item._extractedImage.fileName.toLowerCase();
-            // Проверяем, что image_url существует И является строкой
-          } else if (item.image_url && typeof item.image_url === 'string') {
-            try {
-              const url = new URL(item.image_url);
-              itemImageId = url.pathname.split('/').pop().toLowerCase();
-            } catch {
-              itemImageId = item.image_url.split('/').pop().toLowerCase();
-            }
-          }
-          const itemKey = `${item.name.toLowerCase()}|${itemDesc}|${itemSku}|${itemImageId || ''}`;
-          return itemKey === duplicateKey;
-        });
-
-        if (firstItem) {
-          processed.duplicates.push({
-            row: rowNumber,
-            data: normalizedRow,
-            existing: firstItem,
-            duplicateType: 'file' // Помечаем, что это дубликат внутри файла
-          });
-          console.log(`Дубликат в файле для "${name}" (строка ${rowNumber})`);
-          return;
-        }
-      }
-
-      // Проверяем конфликт артикулов внутри файла
-      // Если артикул уже встречался, проверяем обязательные поля
-      if (importedSkus.has(normalizedSku)) {
-        // Находим первый товар с таким артикулом
-        const firstItemWithSku = processed.items.find(item => {
-          const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
-          return itemSku === normalizedSku;
-        });
-
-        if (firstItemWithSku) {
-          // Проверяем совпадают ли все обязательные поля
-          const itemName = (firstItemWithSku.name || '').toLowerCase().trim();
-          const itemCategory = (firstItemWithSku.category || '').toLowerCase().trim();
-          const itemLocation = (firstItemWithSku.location || '').toLowerCase().trim();
-          const itemUnit = (firstItemWithSku.unit || '').toLowerCase().trim();
-
-          const nameMatches = itemName === name.toLowerCase();
-          const categoryMatches = itemCategory === category.toLowerCase();
-          const locationMatches = itemLocation === location.toLowerCase();
-          const unitMatches = itemUnit === unit.toLowerCase();
-
-          // Если ВСЕ обязательные поля совпадают → это дубликат
-          if (nameMatches && categoryMatches && locationMatches && unitMatches) {
-            processed.duplicates.push({
-              row: rowNumber,
-              data: normalizedRow,
-              existing: firstItemWithSku,
-              duplicateType: 'file' // Дубликат внутри файла (по обязательным полям)
-            });
-            console.log(`Дубликат в файле (по артикулу и обязательным полям) для "${name}"`);
-            return;
-          }
-        }
-
-        // Если обязательные поля отличаются → ошибка (конфликт артикулов)
-        processed.errors.push({
-          row: rowNumber,
-          data: normalizedRow,
-          message: `Артикул "${sku}" дублируется в файле (первый: "${firstItemWithSku?.name || 'неизвестно'}"). Артикул должен быть уникальным`
-        });
-        return;
-      }
-
-      // Добавляем ключ для отслеживания дубликатов внутри файла
-      importedDuplicateKeys.add(duplicateKey);
-      // Добавляем артикул для отслеживания конфликтов
-      importedSkus.add(normalizedSku);
-    }
-
-    // Если это дубликат с существующим в базе товаром
-    if (isDuplicate && existingItem) {
-      processed.duplicates.push({
-        row: rowNumber,
-        data: normalizedRow,
-        existing: existingItem,
-        duplicateType: 'database' // Помечаем, что это дубликат с базой
+    if (importedSkus.has(lowerSku)) {
+      processed.errors.push({
+        row: excelRow,
+        data: data,
+        message: `Дубликат артикула "${sku}" в файле`
       });
-      console.log(`Дубликат с базой для "${name}":`, existingItem);
-      return; // НЕ добавляем дубликат в список для импорта
+      return;
     }
+    importedSkus.add(lowerSku);
 
-    // Проверка: артикул совпадает с базой
-    // Если все обязательные поля идентичны → дубликат
-    // Если обязательные поля отличаются → ошибка (конфликт артикулов)
-    if (!isDuplicate) {
-      const itemWithSameSku = existingItems.find(item => {
-        const itemSku = item.sku ? String(item.sku).trim().toLowerCase() : '';
-        return itemSku !== '' && itemSku === normalizedSku;
-      });
+    const existing = existingItems.find(item => String(item.sku).toLowerCase() === lowerSku);
+    if (existing) {
+      const isFullDuplicate =
+        existing.name === name &&
+        (existing.category || '') === (data.category || '') &&
+        (existing.location || '') === (data.location || '');
 
-      if (itemWithSameSku) {
-        // Проверяем совпадают ли все обязательные поля
-        const itemName = (itemWithSameSku.name || '').toLowerCase().trim();
-        const itemCategory = (itemWithSameSku.category || '').toLowerCase().trim();
-        const itemLocation = (itemWithSameSku.location || '').toLowerCase().trim();
-        const itemUnit = (itemWithSameSku.unit || '').toLowerCase().trim();
-
-        const nameMatches = itemName === name.toLowerCase();
-        const categoryMatches = itemCategory === category.toLowerCase();
-        const locationMatches = itemLocation === location.toLowerCase();
-        const unitMatches = itemUnit === unit.toLowerCase();
-
-        // Логируем сравнение для отладки
-        console.log(`🔍 Сравнение с базой для артикула "${sku}":`);
-        console.log(`   Название: файл="${name}" vs база="${itemWithSameSku.name}" → ${nameMatches ? '✅' : '❌'}`);
-        console.log(`   Категория: файл="${category}" vs база="${itemWithSameSku.category}" → ${categoryMatches ? '✅' : '❌'}`);
-        console.log(`   Место: файл="${location}" vs база="${itemWithSameSku.location}" → ${locationMatches ? '✅' : '❌'}`);
-        console.log(`   Единица: файл="${unit}" vs база="${itemWithSameSku.unit}" → ${unitMatches ? '✅' : '❌'}`);
-
-        // Если ВСЕ обязательные поля совпадают → это дубликат
-        if (nameMatches && categoryMatches && locationMatches && unitMatches) {
-          processed.duplicates.push({
-            row: rowNumber,
-            data: normalizedRow,
-            existing: itemWithSameSku,
-            duplicateType: 'database' // Дубликат с базой (по обязательным полям)
-          });
-          console.log(`Дубликат с базой (по артикулу и обязательным полям) для "${name}":`, itemWithSameSku);
-          return;
-        }
-
-        // Собираем список несовпадающих полей для информативного сообщения
-        const mismatches = [];
-        if (!nameMatches) mismatches.push(`название: "${name}" ≠ "${itemWithSameSku.name}"`);
-        if (!categoryMatches) mismatches.push(`категория: "${category}" ≠ "${itemWithSameSku.category}"`);
-        if (!locationMatches) mismatches.push(`место: "${location}" ≠ "${itemWithSameSku.location}"`);
-        if (!unitMatches) mismatches.push(`единица: "${unit}" ≠ "${itemWithSameSku.unit}"`);
-
-        // Если обязательные поля отличаются → ошибка (конфликт артикулов)
-        processed.errors.push({
-          row: rowNumber,
-          data: normalizedRow,
-          message: `Артикул "${sku}" уже существует в базе. Отличия: ${mismatches.join('; ')}`
+      if (isFullDuplicate) {
+        processed.duplicates.push({
+          row: excelRow,
+          data: data,
+          existing: existing,
+          duplicateType: 'database'
         });
         return;
       }
     }
 
-    // Добавляем валидный товар (только если это НЕ дубликат и нет конфликта артикулов)
-    // Сохраняем информацию об извлеченном изображении для последующей загрузки
     const itemData = {
+      sku: sku,
       name: name,
-      category: category || null,
-      unit: unit,
-      location: (normalizedRow.location || '').trim() || null,
-      // Преобразуем sku в строку или число в зависимости от типа (если это число, сохраняем как число)
-      sku: normalizedRow.sku !== null && normalizedRow.sku !== undefined && normalizedRow.sku !== ''
-        ? (typeof normalizedRow.sku === 'number' ? normalizedRow.sku : String(normalizedRow.sku).trim())
-        : null,
-      description: (normalizedRow.description || '').trim() || null,
-      image_url: imageUrl, // Сохраняем URL изображения (если есть)
-      _extractedImage: normalizedRow._extractedImage // Сохраняем извлеченное изображение для загрузки
+      description: data.description || null,
+      category: data.category || null,
+      unit: data.unit || 'шт',
+      location: data.location || null,
+      quantity: data.quantity !== undefined ? data.quantity : null,
+      image_url: data.image_url || null,
+      _extractedImage: data._extractedImage || null,
+      _excelRow: excelRow
     };
-
-    // Удаляем служебные поля перед сохранением (они не должны попасть в базу данных)
-    // _excelRowNumber используется только для сопоставления изображений
 
     processed.items.push(itemData);
   });
 
-  // Загружаем извлеченные изображения в Supabase Storage
-  // Это делаем после обработки всех товаров, чтобы не блокировать интерфейс
+  stats.unmappedImages = Array.from(unmappedImageFiles);
 
-  // Подсчитываем, сколько товаров имеют изображения для загрузки
-  const itemsWithImages = processed.items.filter(item => item._extractedImage && item._extractedImage.blob);
-  console.log(`📊 Статистика после обработки:`);
-  console.log(`   Всего товаров: ${processed.items.length}`);
-  console.log(`   Товаров с изображениями: ${itemsWithImages.length}`);
-  console.log(`   Извлечено изображений из Excel: ${extractedImages.size}`);
-  console.log(`   Связей в imageRowMap: ${imageRowMap.size}`);
+  console.log('═══════════════════════════════════════');
+  console.log('📊 ИТОГОВЫЙ ОТЧЕТ ИМПОРТА:');
+  console.log(`   Всего строк в файле: ${stats.totalRows}`);
+  console.log(`   Строк с артикулом: ${stats.processedRows - stats.rowsWithoutSku.length}`);
+  console.log(`   Ошибок (пропущено): ${processed.errors.length}`);
+  console.log(`   Дубликатов: ${processed.duplicates.length}`);
+  console.log(`   Готово к импорту: ${processed.items.length}`);
+  console.log(`   Картинок найдено в Excel: ${stats.imagesFound}`);
+  console.log(`   Картинок сопоставлено: ${stats.imagesMatched}`);
+  console.log('═══════════════════════════════════════');
 
-  if (itemsWithImages.length === 0 && extractedImages.size > 0) {
-    console.error(`❌ ПРОБЛЕМА: Изображения извлечены (${extractedImages.size}), но ни одно не сопоставлено с товарами!`);
-    console.error(`   Возможные причины:`);
-    console.error(`   1. imageRowMap не работает или пустой (${imageRowMap.size} связей)`);
-    console.error(`   2. Неправильное сопоставление индексов строк`);
-    console.error(`   3. Артикулы не извлекаются из строк`);
-  }
-
-  if (extractedImages.size > 0 && itemsWithImages.length > 0) {
-    console.log(`Начинаем загрузку ${itemsWithImages.length} изображений в Supabase Storage...`);
+  if (processed.items.some(it => it._extractedImage)) {
     await uploadExtractedImages(processed, uploadFileToStorage);
-  } else if (extractedImages.size > 0) {
-    console.warn(`⚠️ Изображения извлечены, но не будут загружены, так как не сопоставлены с товарами.`);
   }
 
   return processed;
 }
+
 
 /**
  * Загрузить извлеченные изображения в Supabase Storage
@@ -5350,7 +4529,7 @@ function createDuplicateElement(duplicate) {
 
       // Находим родительский контейнер (может быть .section-items или прямой родитель)
       let parentContainer = div.parentElement;
-      // Если родитель - это .section-items, используем его, иначе ищем выше
+      // Если родитель - это .section-items, используем его
       if (parentContainer && parentContainer.classList.contains('section-items')) {
         parentContainer.replaceChild(processedElement, div);
       } else if (parentContainer) {
@@ -5527,6 +4706,9 @@ async function handleImport() {
     showError('Нет данных для импорта. Сначала загрузите файл.');
     return;
   }
+
+  // Сбрасываем кэш товаров, чтобы при переходе на страницу списка они загрузились заново
+  if (window.currentItems) window.currentItems = null;
 
   console.log(`Начинаем импорт ${importedData.items.length} товаров...`);
 

@@ -8,7 +8,7 @@
  */
 
 // Версия кэша — меняйте при обновлении приложения, чтобы пользователи получили новые файлы
-const CACHE_VERSION = 'v1.0.5';
+const CACHE_VERSION = 'v1.0.6';
 const CACHE_NAME = `sabor-inventura-${CACHE_VERSION}`;
 
 // Список файлов для кэширования (эти файлы будут доступны офлайн)
@@ -45,18 +45,14 @@ const FILES_TO_CACHE = [
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Установка...');
 
-  // waitUntil говорит браузеру "подожди, пока эта операция завершится"
+  // Избегаем ожидания и сразу активируем новый воркер
+  self.skipWaiting();
+
   event.waitUntil(
-    // Открываем (или создаём) кэш с нашим именем
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('[Service Worker] Кэширование файлов...');
-        // Добавляем все файлы в кэш
         return cache.addAll(FILES_TO_CACHE);
-      })
-      .then(() => {
-        // skipWaiting() активирует новый Service Worker сразу, не дожидаясь закрытия вкладок
-        return self.skipWaiting();
       })
       .catch((error) => {
         console.error('[Service Worker] Ошибка кэширования:', error);
@@ -72,10 +68,8 @@ self.addEventListener('activate', (event) => {
   console.log('[Service Worker] Активация...');
 
   event.waitUntil(
-    // Получаем список всех кэшей
     caches.keys()
       .then((cacheNames) => {
-        // Удаляем все кэши, которые не соответствуют текущей версии
         return Promise.all(
           cacheNames
             .filter((cacheName) => cacheName !== CACHE_NAME)
@@ -86,7 +80,6 @@ self.addEventListener('activate', (event) => {
         );
       })
       .then(() => {
-        // clients.claim() берёт контроль над всеми открытыми страницами
         return self.clients.claim();
       })
   );
@@ -95,45 +88,41 @@ self.addEventListener('activate', (event) => {
 /**
  * Событие "fetch" — срабатывает при каждом сетевом запросе
  * Стратегия: "Сначала сеть, потом кэш" (Network First)
- * - Пытаемся получить свежие данные из сети
- * - Если сеть недоступна, отдаём из кэша
  */
 self.addEventListener('fetch', (event) => {
-  // Пропускаем запросы к внешним ресурсам, КРОМЕ шрифтов и иконок Google
+  // Игнорируем запросы не GET (например, POST для Supabase)
+  if (event.request.method !== 'GET') return;
+
+  // Пропускаем внешние запросы (кроме шрифтов)
   const isGoogleFont = event.request.url.includes('fonts.googleapis.com') ||
     event.request.url.includes('fonts.gstatic.com');
 
-  if (!event.request.url.startsWith(self.location.origin) && !isGoogleFont) {
-    return;
-  }
+  const isInternal = event.request.url.startsWith(self.location.origin);
 
-  // Пропускаем любые запросы, кроме GET (например, POST запросы в базу кэшировать нельзя)
-  if (event.request.method !== 'GET') {
-    return;
-  }
+  if (!isInternal && !isGoogleFont) return;
 
   event.respondWith(
-    // Сначала пытаемся получить из сети
+    // Пытаемся получить свежее из сети
     fetch(event.request)
       .then((networkResponse) => {
-        // Если получили ответ — сохраняем копию в кэш
+        // Если получили ответ 200 — сохраняем в кэш
         if (networkResponse && networkResponse.status === 200) {
           const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseClone);
-            });
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
         }
         return networkResponse;
       })
       .catch(() => {
-        // Если сеть недоступна — ищем в кэше
-        return caches.match(event.request)
+        // ОШИБКА СЕТИ — ищем в кэше
+        return caches.match(event.request, { ignoreSearch: true })
           .then((cachedResponse) => {
             if (cachedResponse) {
               return cachedResponse;
             }
-            // Если нет в кэше — показываем офлайн-страницу для HTML
+
+            // Если это запрос страницы (HTML), но её нет в кэше — отдаем главную
             if (event.request.headers.get('accept').includes('text/html')) {
               return caches.match('./index.html');
             }
@@ -141,6 +130,7 @@ self.addEventListener('fetch', (event) => {
       })
   );
 });
+
 
 /**
  * Обработка push-уведомлений (на будущее)

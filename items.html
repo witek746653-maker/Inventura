@@ -401,14 +401,7 @@
             .catch(err => console.log('Service Worker ошибка:', err));
         });
 
-        // Этот код ловит момент, когда новый SW берет управление на себя
-        // и автоматически обновляет страницу, чтобы применились новые файлы
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
-            window.location.reload();
-            refreshing = true;
-          }
-        });
+        // Убрали автоматическую перезагрузку, так как она вызывала циклы на некоторых страницах
       }
     </script>
 </body>
