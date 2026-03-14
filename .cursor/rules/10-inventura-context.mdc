@@ -1,0 +1,14 @@
+---
+alwaysApply: true
+---
+
+# Inventura: project context (technical only)
+
+These are PROJECT-SPECIFIC technical constraints.
+Do NOT override global communication/teaching rules.
+
+- This is an offline-first web app (PWA).
+- The app must continue working without internet.
+- Local data is stored in IndexedDB (browser database).
+- Remote backend (Supabase) is used only for synchronization.
+- Network can fail at any time; all network actions must handle errors gracefully.

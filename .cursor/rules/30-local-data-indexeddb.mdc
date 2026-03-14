@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+# Inventura: IndexedDB rules (local data)
+
+- Local IndexedDB is the source of truth (primary storage).
+- Any feature must save changes locally first.
+- Keep DB schema changes minimal and compatible with existing users.
+- When changing DB structure, include a clear migration/upgrade path.
+- Avoid new heavy dependencies for local storage unless absolutely required.

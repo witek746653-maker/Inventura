@@ -1,0 +1,12 @@
+---
+alwaysApply: true
+---
+# Inventura: offline + Service Worker rules
+
+- Always assume offline mode is common.
+- Never break offline usage when changing UI or data flows.
+
+Service Worker rules:
+- If you add/rename/remove static files (HTML/CSS/JS/images), ensure the cache list/version is updated.
+- Do NOT cache or intercept mutating API calls (POST/PUT/PATCH/DELETE).
+- For GET requests, prefer safe caching strategies and clear fallbacks when offline.

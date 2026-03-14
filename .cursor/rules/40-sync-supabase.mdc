@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+# Inventura: sync rules (Supabase)
+
+- Sync must be resilient: handle timeouts, offline, and server errors.
+- Never assume the server is reachable.
+- Prefer incremental sync (only changed records), not full re-download.
+- If conflict resolution exists, keep it consistent and documented in code comments.
+- Never store secrets (keys/tokens) directly in code; use environment variables or safe config.
