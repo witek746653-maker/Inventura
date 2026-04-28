@@ -1,197 +1,49 @@
-# Приложение инвентаризации для ресторана
+# Inventura
 
-Простое веб-приложение для проведения инвентаризации в ресторане. Работает на телефоне, планшете и компьютере с поддержкой офлайн-режима и синхронизацией данных.
+A robust restaurant inventory management application with offline support and cloud synchronization.
 
-## Возможности
+## 📝 Overview
+Inventura is a Progressive Web App (PWA) designed to streamline the inventory process in a restaurant environment. It allows staff to perform inventory sessions on mobile devices, even without an internet connection, and syncs data to a central database once online.
 
-- 📦 Управление базой товаров
-- 📊 Проведение инвентаризации
-- 📈 История инвентаризаций и отчеты
-- 📥 Импорт товаров из Excel/CSV
-- 📤 Экспорт данных в Excel
-- 🗑️ Полная очистка базы данных
-- 🔄 Синхронизация между устройствами
-- 📱 Работа без интернета (офлайн-режим)
+## 🚀 Features
+- **Item Management**: Comprehensive database for tracking restaurant stock.
+- **Inventory Sessions**: Structured workflow for conducting counts (Draft, In Progress, Completed).
+- **Offline First**: Full functionality without internet via IndexedDB.
+- **Cloud Sync**: Real-time synchronization with Supabase.
+- **Advanced Import**: Excel/CSV import with support for floating images (Excel anchors).
+- **History & Reporting**: Detailed logs of previous sessions and inventory differences.
 
-## Технологии
+## 🛠 Tech Stack
+- **Frontend**: HTML5, Tailwind CSS, Vanilla JavaScript.
+- **Storage**: IndexedDB (Local), Supabase/PostgreSQL (Remote).
+- **Utilities**: XLSX.js for Excel processing.
+- **PWA**: Service Workers for offline access.
 
-- **Frontend**: HTML, CSS (Tailwind), Vanilla JavaScript
-- **Локальное хранилище**: IndexedDB
-- **Backend**: Supabase (база данных и синхронизация)
-- **Хранилище кода**: GitHub
-
-## Установка и настройка
-
-### 1. Клонирование репозитория
-
-```bash
-git clone https://github.com/ваш-username/Inventura.git
-cd Inventura
-```
-
-### 2. Настройка Supabase
-
-1. Создайте аккаунт на [supabase.com](https://supabase.com) (бесплатно)
-2. Создайте новый проект
-3. В настройках проекта найдите раздел "API"
-4. Скопируйте:
-   - **Project URL** (например: `https://xxxxx.supabase.co`)
-   - **anon public key** (длинная строка)
-
-### 3. Создание таблиц в базе данных
-
-В Supabase откройте SQL Editor и выполните следующий SQL скрипт:
-
-```sql
--- Таблица товаров
-CREATE TABLE items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  category TEXT,
-  unit TEXT,
-  location TEXT,
-  image_url TEXT,
-  sku TEXT,
-  description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Таблица сессий инвентаризации
-CREATE TABLE inventory_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  date DATE NOT NULL,
-  status TEXT DEFAULT 'in_progress', -- in_progress, completed, draft
-  items_count INTEGER DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Таблица записей инвентаризации
-CREATE TABLE inventory_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID REFERENCES inventory_sessions(id) ON DELETE CASCADE,
-  item_id UUID REFERENCES items(id) ON DELETE CASCADE,
-  quantity DECIMAL(10, 2) NOT NULL,
-  previous_quantity DECIMAL(10, 2),
-  difference DECIMAL(10, 2),
-  comment TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Таблица отчетов инвентаризации (используется на странице "История")
-CREATE TABLE inventory_reports (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID REFERENCES inventory_sessions(id) ON DELETE CASCADE,
-  date DATE NOT NULL,
-  total_items INTEGER DEFAULT 0,
-  items_with_difference INTEGER DEFAULT 0,
-  positive_difference INTEGER DEFAULT 0,
-  negative_difference INTEGER DEFAULT 0,
-  items JSONB DEFAULT '[]'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Индексы для быстрого поиска
-CREATE INDEX idx_items_category ON items(category);
-CREATE INDEX idx_items_location ON items(location);
-CREATE INDEX idx_inventory_items_session ON inventory_items(session_id);
-CREATE INDEX idx_inventory_items_item ON inventory_items(item_id);
-CREATE INDEX idx_inventory_reports_session ON inventory_reports(session_id);
-CREATE INDEX idx_inventory_reports_date ON inventory_reports(date);
-```
-
-### 4. Настройка конфигурации
-
-1. Скопируйте файл `config/supabase-config.example.js` в `config/supabase-config.js`
-2. Откройте `config/supabase-config.js` и вставьте ваши данные:
-
-```javascript
-export const supabaseConfig = {
-  url: 'https://ваш-проект.supabase.co',
-  anonKey: 'ваш-anon-key'
-};
-```
-
-**Важно (безопасность)**: `anon key` в Supabase считается “публичным”, но доступ к данным должен защищаться правилами **RLS** (Row Level Security).
-Если вы публикуете приложение на GitHub Pages, ключ неизбежно будет доступен пользователям — включите RLS и настройте политики на чтение/запись так, как вам нужно.
-
-### 5. Запуск приложения
-
-Откройте `index.html` в браузере или используйте локальный сервер:
-
-```bash
-# С помощью Python
-python -m http.server 8000
-
-# Или с помощью Node.js (если установлен)
-npx http-server
-```
-
-Затем откройте в браузере: `http://localhost:8000`
-
-## Структура проекта
-
-```
+## 📂 Project Structure
+```text
 Inventura/
-├── index.html                 # Главная страница
-├── items.html                 # Список товаров
-├── inventory-session.html     # Сессия инвентаризации
-├── item-details.html          # Детали товара
-├── items-management.html      # Управление данными (экспорт/импорт/удаление)
-├── inventory-history.html     # История инвентаризаций
-│
-├── js/                        # JavaScript код
-│   ├── app.js                 # Главный файл приложения
-│   ├── db.js                  # Работа с IndexedDB
-│   ├── supabase.js            # Подключение к Supabase
-│   ├── items.js               # Логика товаров
-│   ├── inventory.js           # Логика инвентаризации
-│   └── sync.js                # Синхронизация данных
-│
-├── config/                    # Конфигурация
-│   └── supabase-config.js     # Настройки Supabase (не в Git)
-│
-└── assets/                    # Ресурсы
-    └── images/                # Изображения
+├── assets/              # Icons and static images
+├── config/              # Supabase configuration
+├── js/                  # Modular logic (db.js, sync.js, inventory.js)
+├── items.html           # Item management page
+├── inventory-session.html # Active inventory interface
+└── index.html           # Dashboard entry point
 ```
 
-## Как это работает
+## 💻 Developer Instructions
+### Setup
+1. **Clone & Install**:
+   ```bash
+   git clone <repo-url>
+   npm install
+   ```
+2. **Supabase Config**:
+   - Copy `config/supabase-config.example.js` to `config/supabase-config.js`.
+   - Fill in your `Project URL` and `anon key`.
+3. **Database Schema**:
+   - Execute the SQL provided in the original Russian documentation (or check `supabase_schema_*.sql` files) in your Supabase SQL Editor.
+4. **Run**:
+   - Use a local server (e.g., `python -m http.server`) to avoid CORS issues with modules.
 
-1. **Локальное хранилище**: Все данные сначала сохраняются в IndexedDB (локальная база данных браузера)
-2. **Офлайн-режим**: Приложение работает даже без интернета
-3. **Синхронизация**: Когда есть интернет, данные автоматически синхронизируются с Supabase
-4. **Безопасность**: Данные хранятся и локально, и на сервере - ничего не потеряется
-
-### Импорт Excel с фотографиями
-
-Импорт поддерживает фиксированную структуру колонок (1..8): артикул, фото, название, описание, категория, единицы, место хранения, количество. Диапазон данных определяется по первому и последнему непустому артикулу в колонке 1 (после строки заголовка). Если количество отсутствует, оно сохраняется как `null`. 
-
-Фотографии берутся не из ячеек, а из объектов листа (рисунки поверх таблицы). Для корректного сопоставления используется координата верхнего левого угла изображения (anchor). Номер строки Excel определяется по `anchor.row` (0-based → 1-based), затем изображение привязывается к артикулу из этой строки. Если изображение не удаётся сопоставить, оно логируется, а импорт продолжается без остановки. 
-
-## Разработка
-
-### Добавление новых функций
-
-1. Создайте новый файл в папке `js/` для новой функциональности
-2. Подключите его в HTML файлах через `<script>` тег
-3. Используйте существующие функции из `db.js` и `supabase.js`
-
-### Отладка
-
-- Откройте DevTools в браузере (F12)
-- Проверьте консоль на наличие ошибок
-- В разделе Application → IndexedDB можно посмотреть локальные данные
-
-## Лицензия
-
-Этот проект создан для обучения и использования в ресторане.
-
-## Поддержка
-
-Если возникли вопросы или проблемы:
-1. Проверьте, что Supabase настроен правильно
-2. Убедитесь, что таблицы созданы в базе данных
-3. Проверьте консоль браузера на наличие ошибок
+## 📄 License
+Proprietary. Developed for internal restaurant use.
