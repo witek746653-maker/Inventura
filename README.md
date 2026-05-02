@@ -47,3 +47,6 @@ Inventura/
 
 ## 📄 License
 Proprietary. Developed for internal restaurant use.
+
+## Правила для автоматизированных агентов
+См. папку [.agent](.agent/overview.md) — содержит подробные инструкции и правила (по темам: `api.md`, `data.md`, `devops.md`, `frontend.md`, `knowledge.md`, `testing.md`). Также сохранён краткий файл [AGENTS.md](AGENTS.md).

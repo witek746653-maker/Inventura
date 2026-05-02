@@ -1,0 +1,5 @@
+# Inventura: automated testing
+
+- Unit tests and data-processing tests belong in `tests/`.
+- When changing parsing/import logic add tests covering representative sample files.
+- CI should run tests that validate import pipelines (if CI available).

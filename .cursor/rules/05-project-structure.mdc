@@ -1,0 +1,4 @@
+# Project structure
+
+- Keep frontend-only layout. Logic in `js/`, assets in `assets/`.
+- Do not add server code into this repo.

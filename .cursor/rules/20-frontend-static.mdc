@@ -1,0 +1,15 @@
+# Inventura: frontend rules (static PWA + Tailwind)
+
+- Frontend is static PWA: keep pages in repository root and logic in `js/`.
+- Prefer adding pages under existing filenames instead of creating new top-level files.
+
+Styling:
+- Edit `tailwind.input.css` and regenerate `assets/tailwind.css` as documented.
+- Prefer Tailwind utility classes; avoid introducing a JS CSS framework.
+
+Service worker / PWA:
+- When changing `sw.js`, document cache keys and migration strategy.
+- Test offline-first flows after any caching change.
+
+API calls:
+- Use configured Supabase helper in `js/supabase.js` when available.

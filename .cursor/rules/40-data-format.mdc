@@ -1,0 +1,6 @@
+# Inventura: data format (imports/exports)
+
+- Supported formats: CSV, XLSX (Excel). Keep field names stable across versions.
+- When changing import behavior, include sample files and unit tests in `tests/`.
+- Deduplicate by stable identifier (e.g., SKU or internal id).
+- Preserve image anchor handling for Excel imports (floating images) and document changes.

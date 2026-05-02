@@ -1,0 +1,9 @@
+# Inventura: storage & sync (IndexedDB + Supabase)
+
+- Local storage: IndexedDB is the primary local store. Keep schema changes backwards-compatible.
+- Sync logic must handle partial failures and resume safely.
+- Any change to remote table schemas must include migration steps and fallback behavior.
+- Do NOT commit service keys; use config examples and env instructions.
+
+Testing:
+- Add integration-like tests that simulate offline -> online sync where possible.
